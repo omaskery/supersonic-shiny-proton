@@ -50,11 +50,31 @@ class Token(object):
 	
 	def __init__(self, token_type, value=None):
 		self._line = 1
-		self._col = 0
+		self._col = 1
 		self._type = token_type
 		self._value = value
 		self._pre_whitespace = ""
 		self._post_whitespace = ""
+
+	@property
+	def type(self):
+		return self._type
+
+	@property
+	def value(self):
+		return self._value
+
+	@property
+	def line(self):
+		return self._line
+
+	@property
+	def col(self):
+		return self._col
+
+	@property
+	def pos(self):
+		return self.line, self.col
 
 	def at(self, line, col=0):
 		self._line = line
@@ -80,6 +100,9 @@ class Lexer(object):
 		self._col = 1
 
 		self._next_token = None
+
+	def is_eof(self):
+		return self.peek_token() == None
 
 	def peek_token(self):
 		if self._next_token is None:
@@ -127,10 +150,21 @@ class Lexer(object):
 
 	def _parse_string(self, pre_whitespace):
 		pos = self._pos()
+
+		escapes = {
+			't': '\t',
+			'f': '\f',
+			'r': '\r',
+			'n': '\n',
+			'a': '\a',
+			'"': '"',
+		}
+
 		string = ''
 		if self._peek() != '"':
 			return None
 		self._get()
+
 		escaped = False
 		while not self._is_eof():
 			peeked = self._peek()

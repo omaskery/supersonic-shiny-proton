@@ -1,13 +1,17 @@
 
 
 from .lexer import Lexer
+from .parser import Parser
 
 
 class Assembler(object):
 
 	def assemble(self, source, output):
 		lexer = Lexer(source)
-		while lexer.peek_token() is not None:
-			token = lexer.get_token()
-			print(token)
+		parser = Parser(lexer)
+		while True:
+			instruction = parser.parse_instruction()
+			if instruction is None:
+				break
+			print(instruction)
 
