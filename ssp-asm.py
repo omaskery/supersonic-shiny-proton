@@ -2,12 +2,30 @@
 
 
 from ssp.scripting.assembler import Assembler
+from ssp.scripting.source import FileSource
 import argparse
+import os
 
 
 def main():
 	args = get_args()
-	print(args)
+
+	if args.verbose is not None:
+		print("verbose level:", args.verbose)
+	else:
+		args.verbose = 0
+
+	if args.output is None:
+		filepath = os.path.basename(args.input.name) + ".bin"
+		args.output = open(filepath, 'wb')
+
+	if args.verbose > 0:
+		print("input path: ", args.input.name)
+		print("output path:", args.output.name)
+
+	source = FileSource(args.input, args.input.name)
+	assembler = Assembler()
+	assembler.assemble(source, args.output)
 
 
 def get_args():

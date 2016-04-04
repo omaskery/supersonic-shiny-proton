@@ -1,6 +1,0 @@
-
-
-class Assembler(object):
-
-	pass
-
