@@ -27,13 +27,10 @@ class Assembler(object):
 
 		while True:
 			try:
-				opcode = unpacker.unpack()
-				parameters = unpacker.unpack()
+				instruction = Instruction.from_unpacker(unpacker)
 			except msgpack.OutOfData:
 				break
 
-			instruction = Instruction(opcode, parameters)
-			
 			output.write("{}\n".format(instruction.pretty_string()))
 
 	def _write(self, output, value):
