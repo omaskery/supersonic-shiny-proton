@@ -16,16 +16,30 @@ def main():
 		args.verbose = 0
 
 	if args.output is None:
-		filepath = os.path.basename(args.input.name) + ".bin"
-		args.output = open(filepath, 'wb')
+		if not args.disasm:
+			extension = ".bin"
+		else:
+			extension = ".asm"
+
+		filepath = os.path.basename(args.input) + extension
+		
+	if not args.disasm:
+		input_file = open(args.input, 'r', encoding='utf8')
+		output_file = open(filepath, 'wb')
+	else:
+		input_file = open(args.input, 'rb')
+		output_file = open(filepath, 'w', encoding='utf8')
 
 	if args.verbose > 0:
-		print("input path: ", args.input.name)
-		print("output path:", args.output.name)
+		print("input path: ", args.input)
+		print("output path:", args.output)
 
-	source = FileSource(args.input, args.input.name)
+	source = FileSource(input_file, args.input)
 	assembler = Assembler()
-	assembler.assemble(source, args.output)
+	if not args.disasm:
+		assembler.assemble(source, output_file)
+	else:
+		assembler.disassemble(input_file, output_file)
 
 
 def get_args():
@@ -33,12 +47,14 @@ def get_args():
 		description="assembler for the Supersonic Shiny Proton assembly"
 	)
 	parser.add_argument(
-		'input', type=argparse.FileType('r', encoding='utf8'),
-		help='the input assembly file to be assembled'
+		'input', help='the input file to be [dis]assembled'
 	)
 	parser.add_argument(
-		'-o', '--output', type=argparse.FileType('wb'),
-		help='the output binary file to be generated'
+		'-o', '--output', help='the output file to be generated'
+	)
+	parser.add_argument(
+		'-d', '--disasm', action='store_true',
+		help='disassembles a binary file into assembly instead of assembling'
 	)
 	parser.add_argument(
 		'-v', '--verbose', action='count',
