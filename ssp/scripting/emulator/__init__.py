@@ -153,7 +153,7 @@ class Emulator(object):
 		extra = handler[1:]
 		arguments = tuple([self, inst] + list(extra))
 
-		print("executing", inst)
+		print("[{}] executing: {}".format(self._inst_ptr, inst))
 		fn(*arguments)
 
 	def many_step(self, n):
@@ -177,10 +177,18 @@ class Emulator(object):
 		self._stack.append(value)
 
 	def _pop(self, n=1, preserve_order=False):
+		if len(self._stack) < n:
+			self.trigger_error(
+				"attempted to pop {} with only {} on stack at {}".format(
+					n, len(self._stack), self._inst_ptr
+				)
+			)
 		result = self._stack[-n:]
 		self._stack = self._stack[:-n]
 		if not preserve_order:
 			result.reverse()
+		if n == 1:
+			result = result[0]
 		return result
 
 	def _send(self, values):
