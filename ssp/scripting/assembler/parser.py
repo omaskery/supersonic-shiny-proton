@@ -82,10 +82,10 @@ class Instruction(object):
 		return self
 
 	def __str__(self):
-		return "{} ({}): {}".format(
-			Opcode.to_string(self._opcode), self._opcode,
-			", ".join(map(str, self._parameters))
-		)
+		result = "{} ({})".format(Opcode.to_string(self._opcode), self._opcode)
+		if len(self._parameters) > 0:
+			result += ": " + ", ".join(map(str, self._parameters))
+		return result
 
 
 class Parser(object):

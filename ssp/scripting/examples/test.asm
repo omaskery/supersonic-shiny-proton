@@ -6,6 +6,16 @@ send
 push ["."]
 send
 
+push {
+	"test": [
+		1, 2, 3, "four"
+	],
+	"twenty": {
+		"five": 6,
+		"seven": {}
+	}
+}
+
 # example of saving to filesystem:
 
 # (assume data to write is top of the stack)
