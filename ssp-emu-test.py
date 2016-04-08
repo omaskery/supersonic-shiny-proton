@@ -5,33 +5,63 @@ from ssp.scripting.emulator import Emulator, load_program, BlockingReason
 import argparse
 
 
+class EmuTest(object):
+
+	def __init__(self, program):
+		self._emu = Emulator()
+		self._emu.hook_error(self._on_error)
+		self._emu.hook_halted(self._on_halted)
+		self._emu.hook_send(self._on_send)
+		self._emu.hook_block(self._on_block)
+		self._emu.set_program(program)
+
+	def test(self):
+		self._emu.resume()
+		while self._emu.running:
+			self._emu.single_step()
+			if self._emu.running:
+				input("...")
+
+	def _on_error(self, emu, err):
+		print("error:", err)
+
+	def _on_halted(self, emu):
+		print("halted")
+
+	def _on_send(self, emu, target, values):
+		print("sending:", values, "to", target)
+		response = None
+		if target == 'sys':
+			if len(values) > 0 and values[0] == 'ls':
+				response = [
+					"blah.txt",
+					"your_mom"
+				]
+			else:
+				print("unknown syscall")
+		elif target == 'fs':
+			if len(values) > 0 and values[0] == 'open':
+				response = 0
+			else:
+				print("unknown fs operation")
+		else:
+			print("unknown target")
+		if response is not None:
+			print("responding to emu:", response)
+			emu.receive(target, response)
+
+	def _on_block(self, emu, reason):
+		print("blocked on", BlockingReason.to_string(reason))
+
+
 def main():
 	args = get_args()
 
 	program = load_program(args.input)
 	print("loaded {} instructions".format(len(program)))
 
-	emu = Emulator()
-	emu.hook_error(
-		lambda emu, err: print("error:", err)
-	)
-	emu.hook_halted(
-		lambda emu: print("halted")
-	)
-	emu.hook_send(
-		lambda emu, values: print("sending:", values)
-	)
-	emu.hook_block(
-		lambda emu, reason: print("blocked on", BlockingReason.to_string(reason))
-	)
-
-	emu.set_program(program)
-
-	emu.resume()
-	while emu.running:
-		emu.single_step()
-		if emu.running:
-			input("...")
+	test = EmuTest(program)
+	test.test()
 
 
 def get_args():

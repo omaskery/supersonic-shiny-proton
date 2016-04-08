@@ -18,6 +18,7 @@ class Opcode:
 	PUT = 14
 	LOOKUP = 15
 	LEN = 16
+	SENDI = 17
 
 	@classmethod
 	def from_string(cls, string):
@@ -25,6 +26,7 @@ class Opcode:
 			'NOP': cls.NOP,
 			'PUSH': cls.PUSH,
 			'SEND': cls.SEND,
+			'SENDI': cls.SENDI,
 			'SWAP': cls.SWAP,
 			'DUP': cls.DUP,
 			'APPEND': cls.APPEND,
@@ -47,6 +49,7 @@ class Opcode:
 			cls.NOP: 'NOP',
 			cls.PUSH: 'PUSH',
 			cls.SEND: 'SEND',
+			cls.SENDI: 'SENDI',
 			cls.SWAP: 'SWAP',
 			cls.DUP: 'DUP',
 			cls.APPEND: 'APPEND',

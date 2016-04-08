@@ -104,6 +104,25 @@ class Emulator(object):
 		self._blocking_reason = None
 		self._state = EmulatorState.RUNNING
 
+	def receive(self, sender, values):
+		receive_reasons = (
+			BlockingReason.SEND_RESP,
+			BlockingReason.RECV,
+			BlockingReason.LISTEN,
+		)
+
+		if self._blocking_reason not in receive_reasons:
+			print("receive dropped (block state: {})".format(
+				self._blocking_reason
+			))
+			return
+
+		print("received {} from {}".format(values, sender))
+		self._push(sender)
+		self._push(values)
+
+		self.resume()
+
 	def halt(self):
 		if not self.halted:
 			self._state = EmulatorState.HALTED
@@ -144,9 +163,15 @@ class Emulator(object):
 		handler = InstructionSet.MAPPING.get(inst.opcode, None)
 
 		if handler is None:
-			self.trigger_error("unknown opcode {} at {}".format(
-				inst.opcode, self._inst_ptr
-			))
+			name = Opcode.to_string(inst.opcode)
+			if name is not None:
+				self.trigger_error("unimplemented opcode {} at {}".format(
+					name, self._inst_ptr
+				))
+			else:
+				self.trigger_error("unknown opcode {} at {}".format(
+					inst.opcode, self._inst_ptr
+				))
 			return
 
 		fn = handler[0]
@@ -176,28 +201,30 @@ class Emulator(object):
 	def _push(self, value):
 		self._stack.append(value)
 
-	def _pop(self, n=1, preserve_order=False):
+	def _pop(self, n=1, preserve_order=False, collapse_single=True):
 		if len(self._stack) < n:
 			self.trigger_error(
 				"attempted to pop {} with only {} on stack at {}".format(
 					n, len(self._stack), self._inst_ptr
 				)
 			)
+			return None
 		result = self._stack[-n:]
 		self._stack = self._stack[:-n]
 		if not preserve_order:
 			result.reverse()
-		if n == 1:
+		if n == 1 and collapse_single:
 			result = result[0]
 		return result
 
-	def _send(self, values):
+	def _send(self, target, values, block):
+		if block:
+			self._block(BlockingReason.SEND_RESP)
 		if self._on_send is not None:
-			self._on_send(self, values)
-		self._block(BlockingReason.SEND_RESP)
+			self._on_send(self, target, values)
 	
 	def _block(self, reason):
-		self._blocking_rason = reason
+		self._blocking_reason = reason
 		self._state = EmulatorState.BLOCKED
 		if self._on_block is not None:
 			self._on_block(self, reason)
@@ -217,7 +244,7 @@ class Emulator(object):
 			emu._advance_inst()
 
 	@staticmethod
-	def _inst_send(emu, inst):
+	def _inst_send(emu, inst, block):
 		if len(inst.parameters) == 1:
 			count = inst.parameters[0]
 			if not isinstance(count, int):
@@ -225,26 +252,38 @@ class Emulator(object):
 					"send with 1 argument expects an integer argument"
 				)
 				return
-			to_send = emu._pop(count, preserve_order=True)
+			values = emu._pop(count + 1, preserve_order=True, collapse_single=False)
+			if values is None:
+				return
+			target = values[0]
+			to_send = values[1:]
 		elif len(inst.parameters) == 0:
-			to_send = emu._pop()
-			if not isinstance(to_send, list):
+			values = emu._pop()
+			if not isinstance(values, list):
 				emu.trigger_error(
 					"paramaterless send expects a list on top of the stack"
 				)
 				return
+			if len(values) < 1:
+				emu.trigger_error(
+					"parameterless send expects list to have at least one value with the target in"
+				)
+				return
+			target = values[0]
+			to_send = values[1:]
 		else:
 			emu.trigger_error("send at {} expected 1 argument, got {}".format(
 				emu._inst_ptr, len(inst.parameters)
 			))
 			return
-		emu._send(to_send)
+		emu._send(target, to_send, block)
 		emu._advance_inst()
 
 class InstructionSet:
 	MAPPING = {
 		Opcode.NOP: (Emulator._inst_nop,),
 		Opcode.PUSH: (Emulator._inst_push,),
-		Opcode.SEND: (Emulator._inst_send,),
+		Opcode.SEND: (Emulator._inst_send, True),
+		Opcode.SENDI: (Emulator._inst_send, False),
 	}
 

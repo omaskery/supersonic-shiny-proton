@@ -4,7 +4,7 @@
 push ["sys", "ls"]
 send
 push ["."]
-send
+sendi
 
 push {
 	"test": [
