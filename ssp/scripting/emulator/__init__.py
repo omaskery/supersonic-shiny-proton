@@ -279,11 +279,26 @@ class Emulator(object):
 		emu._send(target, to_send, block)
 		emu._advance_inst()
 
+	@staticmethod
+	def _inst_swap(emu, inst):
+		if len(emu._stack) >= 2:
+			temp = emu._stack[-1]
+			emu._stack[-1] = emu._stack[-2]
+			emu._stack[-2] = temp
+		else:
+			emu.trigger_error("swap at {} had stack <2 big".format(
+				emu._inst_ptr
+			))
+			return
+		emu._advance_inst()
+
+
 class InstructionSet:
 	MAPPING = {
 		Opcode.NOP: (Emulator._inst_nop,),
 		Opcode.PUSH: (Emulator._inst_push,),
 		Opcode.SEND: (Emulator._inst_send, True),
 		Opcode.SENDI: (Emulator._inst_send, False),
+		Opcode.SWAP: (Emulator._inst_swap,),
 	}
 

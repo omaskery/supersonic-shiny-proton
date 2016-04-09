@@ -15,6 +15,11 @@ class EmuTest(object):
 		self._emu.hook_block(self._on_block)
 		self._emu.set_program(program)
 
+		self._services = {
+			'sys': self._svc_sys,
+			'fs': self._svc_fs,
+		}
+
 	def test(self):
 		self._emu.resume()
 		while self._emu.running:
@@ -31,20 +36,9 @@ class EmuTest(object):
 	def _on_send(self, emu, target, values):
 		print("sending:", values, "to", target)
 		response = None
-		if target == 'sys':
-			if len(values) > 0 and values[0] == 'ls':
-				response = [
-					"blah.txt",
-					"your_mom"
-				]
-			else:
-				print("unknown syscall")
-		elif target == 'fs':
-			if len(values) > 0 and values[0] == 'open':
-				response = 0
-			else:
-				print("unknown fs operation")
-		else:
+		service = self._services.get(target, None)
+		response = service(values) if service else None
+		if service is None:
 			print("unknown target")
 		if response is not None:
 			print("responding to emu:", response)
@@ -52,6 +46,21 @@ class EmuTest(object):
 
 	def _on_block(self, emu, reason):
 		print("blocked on", BlockingReason.to_string(reason))
+
+	def _svc_sys(self, values):
+		if len(values) > 0 and values[0] == 'ls':
+			return [
+				"blah.txt",
+				"your_mom"
+			]
+		else:
+			print("unknown syscall")
+
+	def _svc_fs(self, values):
+		if len(values) > 0 and values[0] == 'open':
+			return 0
+		else:
+			print("unknown fs operation")
 
 
 def main():
