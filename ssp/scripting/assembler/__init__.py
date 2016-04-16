@@ -184,7 +184,7 @@ class Assembler(object):
 		Opcode.LISTEN: (1, (TokenType.INTEGER,)),
 		Opcode.DICT: (1, (TokenType.INTEGER,)),
 		Opcode.LIST: (1, (TokenType.INTEGER,)),
-		Opcode.PUT: (0,),
+		Opcode.PUT: (1, (TokenType.INTEGER,)),
 		Opcode.LOOKUP: (1, (TokenType.INTEGER, TokenType.STRING)),
 		Opcode.LEN: (0,),
 		Opcode.SENDI: (1, (TokenType.START_LIST,)),

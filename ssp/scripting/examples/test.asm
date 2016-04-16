@@ -80,6 +80,7 @@ pop 1
 
 # or
 push {}		# push an empty dictionary onto the stack
+dup -1		# this dup only exists for debug convenience after put completes
 push "john"	# push the literal "john"
 push 42		# push the literal 42
 push 1
@@ -88,9 +89,7 @@ pop 1
 
 # looking up a value in a dict:
 
-push "john"
-push 1
-lookup		# pops the key ("john") off the stack and looks it up in the dictionary on the top of the stack (pops the dictionary, too), pushes the result
+lookup "john"		# pops the key ("john") off the stack and looks it up in the dictionary on the top of the stack (pops the dictionary, too), pushes the result
 
 # can also be written:
 push "john"

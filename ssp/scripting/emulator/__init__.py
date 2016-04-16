@@ -379,12 +379,76 @@ class Emulator(object):
 			return
 
 		values = emu._pop(pair_count * 2, preserve_order=True)
+		if values is None:
+			return
+
 		result = dict([
 			values[i:i+2]
 			for i in range(0, len(values), 2)
 		])
 
 		emu._push(result)
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_put(emu, inst):
+		if len(inst.parameters) == 0:
+			pair_count = emu._pop()
+		elif len(inst.parameters) == 1:
+			pair_count = inst.parameters[0]
+		else:
+			emu.trigger_error("put expects 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+
+		if not isinstance(pair_count, int):
+			emu.trigger_error("put expects an integer parameter")
+			return
+
+		values = emu._pop(pair_count * 2, preserve_order=True)
+		if values is None:
+			return
+
+		target = emu._pop()
+		if target is None:
+			return
+
+		if not isinstance(target, dict):
+			emu.trigger_error("put expects the stack to contain a dictionary under values")
+			return
+
+		updates = dict([
+			values[i:i+2]
+			for i in range(0, len(values), 2)
+		])
+		target.update(updates)
+		
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_dup(emu, inst):
+		if len(inst.parameters) == 0:
+			offset = emu._pop()
+		elif len(inst.parameters) == 1:
+			offset = inst.parameters[0]
+		else:
+			emu.trigger_error("dup expects 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+
+		if not isinstance(offset, int):
+			emu.trigger_error("dup expects an integer parameter")
+			return
+
+		if offset >= 0:
+			emu.trigger_error("dup expects an integer < 0")
+			return
+
+		target = emu._stack[offset]
+		emu._push(target)
+		
 		emu._advance_inst()
 
 	@staticmethod
@@ -418,5 +482,7 @@ class InstructionSet:
 		Opcode.MUL: (Emulator._inst_binop, Emulator._binop_mul),
 		Opcode.DIV: (Emulator._inst_binop, Emulator._binop_div),
 		Opcode.DICT: (Emulator._inst_dict,),
+		Opcode.PUT: (Emulator._inst_put,),
+		Opcode.DUP: (Emulator._inst_dup,),
 	}
 
