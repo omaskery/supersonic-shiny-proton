@@ -132,7 +132,7 @@ def get_args():
 		help='whether to run emulator in debug mode with waits after each step'
 	)
 	parser.add_argument(
-		'-v', '--verbose', action='count',
+		'-v', '--verbose', action='count', default=0,
 		help='whether to run emulator in verbose mode'
 	)
 	return parser.parse_args()
