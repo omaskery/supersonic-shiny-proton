@@ -100,6 +100,7 @@ pop 1
 # list examples:
 
 push [1, 2, 3]
+pop 1
 
 # or
 
@@ -108,6 +109,7 @@ push 2
 push 3
 push 3
 list
+pop 1
 
 # or
 
@@ -117,6 +119,7 @@ push 2
 push 3
 push 3
 append # appends 3 items from the stack to the list it assumes is 'under' them, also for giggles it will append them IN THE ORDER PUSHED
+pop 1
 
 # or 
 
@@ -128,12 +131,15 @@ append 3	# appends 3 items from the stack to the list it assumes is 'under' them
 
 # indexing into a list can be done as follows:
 
+dup -1
 lookup 0	# pushes the 0th element from a list on top of the stack (popping the list first)
+pop 1
 
+dup -1
 # can also be written
-push 0
 push 1
 lookup
+pop 1
 
 len		# pops whatever is on top of the stack (list, dict, string, ...?) and pushes it's length/number of elements/whatever makes sense
 

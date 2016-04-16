@@ -190,7 +190,7 @@ class Emulator(object):
 			print("[0x{:04X}] executing: {}".format(self._inst_ptr, inst))
 		fn(*arguments)
 		if self._verbose > 1:
-			print("stack:", self._stack)
+			print("stack:", ", ".join(map(str, self._stack)))
 
 	def many_step(self, n):
 		for _ in range(n):
@@ -492,7 +492,30 @@ class Emulator(object):
 			return
 
 		emu._push(result)
-		
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_list(emu, inst):
+		if len(inst.parameters) == 0:
+			count = emu._pop()
+			if count is None: return
+		elif len(inst.parameters) == 1:
+			count = inst.parameters[0]
+		else:
+			emu.trigger_error("list expects 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+
+		if not isinstance(count, int):
+			emu.trigger_error("list expects an integer parameter")
+			return
+
+		values = emu._pop(count, preserve_order=True)
+		if values is None:
+			return
+
+		emu._push(values)
 		emu._advance_inst()
 
 	@staticmethod
@@ -529,5 +552,6 @@ class InstructionSet:
 		Opcode.PUT: (Emulator._inst_put,),
 		Opcode.DUP: (Emulator._inst_dup,),
 		Opcode.LOOKUP: (Emulator._inst_lookup,),
+		Opcode.LIST: (Emulator._inst_list,),
 	}
 
