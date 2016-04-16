@@ -65,6 +65,13 @@ class EmuTest(object):
 	def _svc_fs(self, values):
 		if len(values) > 0 and values[0] == 'open':
 			return 0
+		elif len(values) > 2 and values[0] == 'write':
+			file_handle = values[1]
+			data = values[2]
+			print("writing '{}' to file handle {}".format(
+				data, file_handle
+			))
+			return 0
 		else:
 			self._emu.trigger_error("unknown fs operation '{}' at {}".format(
 				values, self._emu._inst_ptr
