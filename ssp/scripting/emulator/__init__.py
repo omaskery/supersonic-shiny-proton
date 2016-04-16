@@ -118,8 +118,11 @@ class Emulator(object):
 			return
 
 		print("received {} from {}".format(values, sender))
-		self._push(sender)
+		# pushing values first and sender last on the assumption that
+		# you will more often want to discard the sender than the values
+		# so it is more ergonomic to do "POP" than "SWAP; POP"
 		self._push(values)
+		self._push(sender)
 
 		self.resume()
 
@@ -151,7 +154,7 @@ class Emulator(object):
 		self._stack.clear()
 		self._inst_ptr = self._boot_addr
 
-	def single_step(self):
+	def single_step(self, debug=False):
 		if self.halted or self.blocked:
 			return
 
@@ -178,8 +181,11 @@ class Emulator(object):
 		extra = handler[1:]
 		arguments = tuple([self, inst] + list(extra))
 
-		print("[{}] executing: {}".format(self._inst_ptr, inst))
+		if debug:
+			print("[{}] executing: {}".format(self._inst_ptr, inst))
 		fn(*arguments)
+		if debug:
+			print("stack:", self._stack)
 
 	def many_step(self, n):
 		for _ in range(n):
@@ -298,6 +304,46 @@ class Emulator(object):
 			return
 		emu._advance_inst()
 
+	@staticmethod
+	def _inst_append(emu, inst):
+		if len(inst.parameters) != 1:
+			emu.trigger_error(
+				"append requires one integer pop count argument at {}".format(
+					emu._inst_ptr
+				)
+			)
+			return
+		
+		pop_count = inst.parameters[0]
+		if not isinstance(pop_count, int):
+			emu.trigger_error("append at {} expects a single integer pop count".format(
+				emu._inst_ptr
+			))
+			return
+
+		values = emu._pop(pop_count, preserve_order=True, collapse_single=False)
+		if values is None:
+			return
+
+		top = emu._pop()
+		if not isinstance(top, list):
+			emu.trigger_error(
+				"append at {} expects top of stack (under args) to be a list".format(
+					emu._inst_ptr
+				)
+			)
+			return
+
+		top = top + values
+		emu._push(top)
+
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_pop(emu, inst):
+		emu._pop()
+		emu._advance_inst()
+
 
 class InstructionSet:
 	MAPPING = {
@@ -306,5 +352,7 @@ class InstructionSet:
 		Opcode.SEND: (Emulator._inst_send, True),
 		Opcode.SENDI: (Emulator._inst_send, False),
 		Opcode.SWAP: (Emulator._inst_swap,),
+		Opcode.APPEND: (Emulator._inst_append,),
+		Opcode.POP: (Emulator._inst_pop,),
 	}
 

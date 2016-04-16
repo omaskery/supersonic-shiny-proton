@@ -18,6 +18,8 @@
 
 # send ls to the system (shell) subsystem, which pushes the result onto the stack
 send ["sys", "ls"] # this send uses the argpush rule
+# stack is now [..., ls result, "sys"]
+pop
 # stack is now [..., ls result]
 push ["."]
 # stack is now [..., ls result, ["."]]
@@ -28,7 +30,7 @@ append! 1
 # sendi ignores the response (should it still block? :S how to handle response otherwise?)
 # when you send to target "." this means "send to the invoker of this process", typically
 # this is the player's "local machine"
-sendi # this sendi does not use the argpush rule
+sendi # this send has no arguments so it will pop a list to send
 
 # example of saving to filesystem:
 
@@ -36,6 +38,8 @@ push "this is some text to write to file I guess"
 
 # send an open message to the filesystem subsystem, file handle will be on stack afterwards
 send ["fs", "open", "file.bin"]
+# drop the sender
+pop
 # push beginings of send arguments for a filesystem write, we need the file handle next
 push ["fs", "write"]
 # swap the list we just pushed, and the file handle that should be beneath it
@@ -48,6 +52,8 @@ swap
 append! 1
 # stack should now be [..., ["fs", "write", file handle, data]] so send this on to fs
 send
+# drop the sender
+pop
 
 # example of arithmetic (usual stack machine affair):
 

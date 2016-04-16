@@ -19,6 +19,7 @@ class Opcode:
 	LOOKUP = 15
 	LEN = 16
 	SENDI = 17
+	POP = 18
 
 	@classmethod
 	def from_string(cls, string):
@@ -41,6 +42,7 @@ class Opcode:
 			'PUT': cls.PUT,
 			'LOOKUP': cls.LOOKUP,
 			'LEN': cls.LEN,
+			'POP': cls.POP,
 		}[string.upper()]
 
 	@classmethod
@@ -64,5 +66,6 @@ class Opcode:
 			cls.PUT: 'PUT',
 			cls.LOOKUP: 'LOOKUP',
 			cls.LEN: 'LEN',
+			cls.POP: 'POP',
 		}[integer]
 

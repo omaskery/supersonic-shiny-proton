@@ -7,13 +7,15 @@ import argparse
 
 class EmuTest(object):
 
-	def __init__(self, program):
+	def __init__(self, program, debug=False):
 		self._emu = Emulator()
 		self._emu.hook_error(self._on_error)
 		self._emu.hook_halted(self._on_halted)
 		self._emu.hook_send(self._on_send)
 		self._emu.hook_block(self._on_block)
 		self._emu.set_program(program)
+
+		self._debug = debug
 
 		self._services = {
 			'sys': self._svc_sys,
@@ -23,8 +25,8 @@ class EmuTest(object):
 	def test(self):
 		self._emu.resume()
 		while self._emu.running:
-			self._emu.single_step()
-			if self._emu.running:
+			self._emu.single_step(debug=self._debug)
+			if self._emu.running and self._debug:
 				input("...")
 
 	def _on_error(self, emu, err):
@@ -69,7 +71,7 @@ def main():
 	program = load_program(args.input)
 	print("loaded {} instructions".format(len(program)))
 
-	test = EmuTest(program)
+	test = EmuTest(program, debug=args.debug)
 	test.test()
 
 
@@ -80,6 +82,10 @@ def get_args():
 	parser.add_argument(
 		'input', type=argparse.FileType('rb'),
 		help='the binary to load into the emulator'
+	)
+	parser.add_argument(
+		'-d', '--debug', action='store_true',
+		help='whether to run emulator in debug mode with waits after each step'
 	)
 	return parser.parse_args()
 
