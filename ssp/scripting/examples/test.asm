@@ -80,20 +80,22 @@ pop 1
 
 # or
 push {}		# push an empty dictionary onto the stack
-dup -1		# this dup only exists for debug convenience after put completes
+dup -1		# this dup is so a ref to dictionary remains after PUT
 push "john"	# push the literal "john"
 push 42		# push the literal 42
 push 1
 put		# pops the key ("john") and value (42) pair off the stack and puts them into the dictionary left on top of the stack (popping the dictionary at the top)
-pop 1
 
 # looking up a value in a dict:
 
+dup -1
 lookup "john"		# pops the key ("john") off the stack and looks it up in the dictionary on the top of the stack (pops the dictionary, too), pushes the result
+pop 1
 
 # can also be written:
 push "john"
 lookup
+pop 1
 
 # list examples:
 

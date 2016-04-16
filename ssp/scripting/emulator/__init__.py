@@ -260,6 +260,7 @@ class Emulator(object):
 			values = inst.parameters[0]
 		elif len(inst.parameters) == 0:
 			values = emu._pop()
+			if values is None: return
 		else:
 			emu.trigger_error("send expected 0 or 1 arguments, got {}".format(
 				len(inst.parameters)
@@ -295,6 +296,7 @@ class Emulator(object):
 	def _inst_append(emu, inst):
 		if len(inst.parameters) == 0:
 			pop_count = emu._pop()
+			if pop_count is None: return
 		elif len(inst.parameters) == 1:
 			pop_count = inst.parameters[0]
 		else:
@@ -326,6 +328,7 @@ class Emulator(object):
 		count = 1
 		if len(inst.parameters) == 0:
 			count = emu._pop()
+			if count is None: return
 		elif len(inst.parameters) == 1:
 			count = inst.parameters[0]
 		else:
@@ -342,7 +345,7 @@ class Emulator(object):
 	@staticmethod
 	def _inst_binop(emu, inst, op_fn):
 		values = emu._pop(2, preserve_order=True, collapse_single=False)
-		if not values:
+		if values is None:
 			return
 
 		for index, value in enumerate(values):
@@ -366,6 +369,7 @@ class Emulator(object):
 	def _inst_dict(emu, inst):
 		if len(inst.parameters) == 0:
 			pair_count = emu._pop()
+			if pair_count is None: return
 		elif len(inst.parameters) == 1:
 			pair_count = inst.parameters[0]
 		else:
@@ -394,6 +398,7 @@ class Emulator(object):
 	def _inst_put(emu, inst):
 		if len(inst.parameters) == 0:
 			pair_count = emu._pop()
+			if pair_count is None: return
 		elif len(inst.parameters) == 1:
 			pair_count = inst.parameters[0]
 		else:
@@ -430,6 +435,7 @@ class Emulator(object):
 	def _inst_dup(emu, inst):
 		if len(inst.parameters) == 0:
 			offset = emu._pop()
+			if offset is None: return
 		elif len(inst.parameters) == 1:
 			offset = inst.parameters[0]
 		else:
@@ -448,6 +454,44 @@ class Emulator(object):
 
 		target = emu._stack[offset]
 		emu._push(target)
+		
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_lookup(emu, inst):
+		if len(inst.parameters) == 0:
+			needle = emu._pop()
+			if needle is None: return
+		elif len(inst.parameters) == 1:
+			needle = inst.parameters[0]
+		else:
+			emu.trigger_error("lookup expects 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+
+		target = emu._pop()
+		if target is None:
+			return
+
+		if isinstance(target, list):
+			if not isinstance(needle, int):
+				emu.trigger_error("lookup argument for list target must be int")
+				return
+			if 0 <= needle < len(target):
+				result = target[needle]
+			else:
+				emu.trigger_error("lookup argument {} for list out of bounds, len: {}".format(
+					needle, len(target)
+				))
+				return
+		elif isinstance(target, dict):
+			result = target.get(needle, None)
+		else:
+			emu.trigger_error("lookup target must be list or dictionary")
+			return
+
+		emu._push(result)
 		
 		emu._advance_inst()
 
@@ -484,5 +528,6 @@ class InstructionSet:
 		Opcode.DICT: (Emulator._inst_dict,),
 		Opcode.PUT: (Emulator._inst_put,),
 		Opcode.DUP: (Emulator._inst_dup,),
+		Opcode.LOOKUP: (Emulator._inst_lookup,),
 	}
 
