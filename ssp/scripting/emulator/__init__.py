@@ -363,6 +363,31 @@ class Emulator(object):
 		emu._advance_inst()
 
 	@staticmethod
+	def _inst_dict(emu, inst):
+		if len(inst.parameters) == 0:
+			pair_count = emu._pop()
+		elif len(inst.parameters) == 1:
+			pair_count = inst.parameters[0]
+		else:
+			emu.trigger_error("dict expects 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+
+		if not isinstance(pair_count, int):
+			emu.trigger_error("dict expects an integer parameter")
+			return
+
+		values = emu._pop(pair_count * 2, preserve_order=True)
+		result = dict([
+			values[i:i+2]
+			for i in range(0, len(values), 2)
+		])
+
+		emu._push(result)
+		emu._advance_inst()
+
+	@staticmethod
 	def _binop_add(a, b):
 		return a + b
 
@@ -392,5 +417,6 @@ class InstructionSet:
 		Opcode.SUB: (Emulator._inst_binop, Emulator._binop_sub),
 		Opcode.MUL: (Emulator._inst_binop, Emulator._binop_mul),
 		Opcode.DIV: (Emulator._inst_binop, Emulator._binop_div),
+		Opcode.DICT: (Emulator._inst_dict,),
 	}
 

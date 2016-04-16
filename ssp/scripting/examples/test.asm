@@ -72,9 +72,11 @@ pop 1
 push "john"
 push 42
 dict 1
+pop 1
 
 # or
 push {"john": 42}
+pop 1
 
 # or
 push {}		# push an empty dictionary onto the stack
@@ -82,6 +84,7 @@ push "john"	# push the literal "john"
 push 42		# push the literal 42
 push 1
 put		# pops the key ("john") and value (42) pair off the stack and puts them into the dictionary left on top of the stack (popping the dictionary at the top)
+pop 1
 
 # looking up a value in a dict:
 
