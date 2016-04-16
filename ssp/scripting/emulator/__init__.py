@@ -336,8 +336,72 @@ class Emulator(object):
 
 	@staticmethod
 	def _inst_pop(emu, inst):
-		emu._pop()
+		count = 1
+		if len(inst.parameters) != 0:
+			if len(inst.parameters) != 1:
+				emu.trigger_error("pop can only accept 0 or 1 arguments")
+				return
+			count = inst.parameters[0]
+			if not isinstance(count, int):
+				emu.trigger_error("pop optional argument must be an integer")
+				return
+		emu._pop(count)
 		emu._advance_inst()
+
+	@staticmethod
+	def _inst_binop(emu, inst, op_fn, chainable):
+		count = 2
+		if len(inst.parameters) != 0:
+			if len(inst.parameters) != 1:
+				emu.trigger_error("binop expects 0 or 1 arguments, not {}".format(
+					len(inst.parameters)
+				))
+				return
+			count = inst.parameters[0]
+			if not isinstance(count, int):
+				emu.trigger_error("binop expects it's optional argument to be an integer")
+				return
+		values = emu._pop(count, preserve_order=True, collapse_single=False)
+		if not values:
+			return
+
+		for index, value in enumerate(values):
+			if not isinstance(value, (int, float)):
+				emu.trigger_error("arg {} (#{}) is not an integer or float".format(
+					value, index
+				))
+				return
+
+		if chainable is None:
+			if len(values) != 2:
+				emu.trigger_error("{} cannot operate on more than 2 operands".format(
+					Opcode.to_string(inst.opcode)
+				))
+				return
+			result = op_fn(values[0], values[1])
+		else:
+			result = chainable
+			for value in values:
+				result = op_fn(result, value)
+		
+		emu._push(result)
+		emu._advance_inst()
+
+	@staticmethod
+	def _binop_add(a, b):
+		return a + b
+
+	@staticmethod
+	def _binop_sub(a, b):
+		return a - b
+
+	@staticmethod
+	def _binop_mul(a, b):
+		return a * b
+
+	@staticmethod
+	def _binop_div(a, b):
+		return a / b
 
 
 class InstructionSet:
@@ -349,5 +413,9 @@ class InstructionSet:
 		Opcode.SWAP: (Emulator._inst_swap,),
 		Opcode.APPEND: (Emulator._inst_append,),
 		Opcode.POP: (Emulator._inst_pop,),
+		Opcode.ADD: (Emulator._inst_binop, Emulator._binop_add, 0),
+		Opcode.SUB: (Emulator._inst_binop, Emulator._binop_sub, 0),
+		Opcode.MUL: (Emulator._inst_binop, Emulator._binop_mul, 1),
+		Opcode.DIV: (Emulator._inst_binop, Emulator._binop_div, None),
 	}
 

@@ -52,13 +52,14 @@ swap
 append! 1
 # stack should now be [..., ["fs", "write", file handle, data]] so send this on to fs
 send
-# drop the sender
-pop
+# drop the sender and return code from write
+pop! 2
 
 # example of arithmetic (usual stack machine affair):
 
 # pop 2 top values, add them and push the result to the stack
 add 10 15
+pop
 
 # imagine the other operators yourself
 
