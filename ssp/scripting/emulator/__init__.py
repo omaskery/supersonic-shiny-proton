@@ -257,42 +257,26 @@ class Emulator(object):
 	@staticmethod
 	def _inst_send(emu, inst, block):
 		if len(inst.parameters) == 1:
-			count = inst.parameters[0]
-			if not isinstance(count, int):
-				emu.trigger_error(
-					"send with 1 argument expects an integer argument"
-				)
-				return
-			values = emu._pop(count, preserve_order=True, collapse_single=False)
-			if values is None:
-				return
-			def _as_list(x):
-				if isinstance(x, list):
-					return x
-				else:
-					return [x]
-			values = sum(map(_as_list, values), [])
-			target = values[0]
-			to_send = values[1:]
+			values = inst.parameters[0]
 		elif len(inst.parameters) == 0:
 			values = emu._pop()
-			if not isinstance(values, list):
-				emu.trigger_error(
-					"paramaterless send expects a list on top of the stack"
-				)
-				return
-			if len(values) < 1:
-				emu.trigger_error(
-					"parameterless send expects list to have at least one value with the target in"
-				)
-				return
-			target = values[0]
-			to_send = values[1:]
 		else:
-			emu.trigger_error("send expected 1 argument, got {}".format(
+			emu.trigger_error("send expected 0 or 1 arguments, got {}".format(
 				len(inst.parameters)
 			))
 			return
+		if not isinstance(values, list):
+			emu.trigger_error(
+				"send expects a list as only parameter or on top of the stack"
+			)
+			return
+		if len(values) < 1:
+			emu.trigger_error(
+				"send expects value list to have at least one value with the target in"
+			)
+			return
+		target = values[0]
+		to_send = values[1:]
 		emu._send(target, to_send, block)
 		emu._advance_inst()
 
@@ -309,11 +293,14 @@ class Emulator(object):
 
 	@staticmethod
 	def _inst_append(emu, inst):
-		if len(inst.parameters) != 1:
+		if len(inst.parameters) == 0:
+			pop_count = emu._pop()
+		elif len(inst.parameters) == 1:
+			pop_count = inst.parameters[0]
+		else:
 			emu.trigger_error("append requires one integer pop count argument")
 			return
 		
-		pop_count = inst.parameters[0]
 		if not isinstance(pop_count, int):
 			emu.trigger_error("append expects a single integer pop count")
 			return
@@ -337,31 +324,24 @@ class Emulator(object):
 	@staticmethod
 	def _inst_pop(emu, inst):
 		count = 1
-		if len(inst.parameters) != 0:
-			if len(inst.parameters) != 1:
-				emu.trigger_error("pop can only accept 0 or 1 arguments")
-				return
+		if len(inst.parameters) == 0:
+			count = emu._pop()
+		elif len(inst.parameters) == 1:
 			count = inst.parameters[0]
-			if not isinstance(count, int):
-				emu.trigger_error("pop optional argument must be an integer")
-				return
+		else:
+			emu.trigger_error("pop can only accept 0 or 1 arguments, not {}".format(
+				len(inst.parameters)
+			))
+			return
+		if not isinstance(count, int):
+			emu.trigger_error("pop count must be an integer")
+			return
 		emu._pop(count)
 		emu._advance_inst()
 
 	@staticmethod
-	def _inst_binop(emu, inst, op_fn, chainable):
-		count = 2
-		if len(inst.parameters) != 0:
-			if len(inst.parameters) != 1:
-				emu.trigger_error("binop expects 0 or 1 arguments, not {}".format(
-					len(inst.parameters)
-				))
-				return
-			count = inst.parameters[0]
-			if not isinstance(count, int):
-				emu.trigger_error("binop expects it's optional argument to be an integer")
-				return
-		values = emu._pop(count, preserve_order=True, collapse_single=False)
+	def _inst_binop(emu, inst, op_fn):
+		values = emu._pop(2, preserve_order=True, collapse_single=False)
 		if not values:
 			return
 
@@ -372,17 +352,12 @@ class Emulator(object):
 				))
 				return
 
-		if chainable is None:
-			if len(values) != 2:
-				emu.trigger_error("{} cannot operate on more than 2 operands".format(
-					Opcode.to_string(inst.opcode)
-				))
-				return
-			result = op_fn(values[0], values[1])
-		else:
-			result = chainable
-			for value in values:
-				result = op_fn(result, value)
+		if len(values) != 2:
+			emu.trigger_error("{} cannot operate on more than 2 operands".format(
+				Opcode.to_string(inst.opcode)
+			))
+			return
+		result = op_fn(values[0], values[1])
 		
 		emu._push(result)
 		emu._advance_inst()
@@ -413,9 +388,9 @@ class InstructionSet:
 		Opcode.SWAP: (Emulator._inst_swap,),
 		Opcode.APPEND: (Emulator._inst_append,),
 		Opcode.POP: (Emulator._inst_pop,),
-		Opcode.ADD: (Emulator._inst_binop, Emulator._binop_add, 0),
-		Opcode.SUB: (Emulator._inst_binop, Emulator._binop_sub, 0),
-		Opcode.MUL: (Emulator._inst_binop, Emulator._binop_mul, 1),
-		Opcode.DIV: (Emulator._inst_binop, Emulator._binop_div, None),
+		Opcode.ADD: (Emulator._inst_binop, Emulator._binop_add),
+		Opcode.SUB: (Emulator._inst_binop, Emulator._binop_sub),
+		Opcode.MUL: (Emulator._inst_binop, Emulator._binop_mul),
+		Opcode.DIV: (Emulator._inst_binop, Emulator._binop_div),
 	}
 

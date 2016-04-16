@@ -18,15 +18,13 @@
 # send ls to the system (shell) subsystem, which pushes the result onto the stack
 send ["sys", "ls"] # this send uses the argpush rule
 # stack is now [..., ls result, "sys"]
-pop
+pop 1
 # stack is now [..., ls result]
 push ["."]
 # stack is now [..., ls result, ["."]]
 swap
 # stack is now [..., ["."], ls result]
-push 1
-# stack is now [..., ["."], ls result, 1]
-append
+append 1
 # stack is now [..., [".", ls result]], sendi will now send the top result
 # sendi ignores the response (should it still block? :S how to handle response otherwise?)
 # when you send to target "." this means "send to the invoker of this process", typically
@@ -40,7 +38,7 @@ push "this is some text to write to file I guess"
 # send an open message to the filesystem subsystem, file handle will be on stack afterwards
 send ["fs", "open", "file.bin"]
 # drop the sender
-pop
+pop 1
 # push beginings of send arguments for a filesystem write, we need the file handle next
 push ["fs", "write"]
 # swap the list we just pushed, and the file handle that should be beneath it
@@ -57,7 +55,7 @@ append
 send
 # drop the sender and return code from write
 push 2
-pop 2
+pop
 
 # example of arithmetic (usual stack machine affair):
 
@@ -65,7 +63,7 @@ push 10
 push 15
 # pop 2 top values, add them and push the result to the stack
 add
-pop
+pop 1
 
 # imagine the other operators yourself
 

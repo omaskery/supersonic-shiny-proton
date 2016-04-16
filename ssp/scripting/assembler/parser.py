@@ -23,13 +23,13 @@ class Parser(object):
 		while not self._lexer.is_eof() and\
 				self._lexer.peek_token().line == operation.line:
 			parameter_token = self._lexer.get_token()
-			parameters.append(self._parse_value(parameter_token))
+			parameters.append(self._parse_value(parameter_token, top_level=True))
 
 		opcode = Opcode.from_string(operation.value)
 
 		return Instruction(opcode, parameters).at(operation.line, operation.col)
 
-	def _parse_value(self, token):
+	def _parse_value(self, token, top_level=False):
 		result = [token.type, None]
 		mapping = [
 			((TokenType.IDENTIFIER,), None),
@@ -47,7 +47,10 @@ class Parser(object):
 				else:
 					result[1] = handler(token)
 				break
-		return tuple(result)
+		if top_level:
+			return tuple(result)
+		else:
+			return result[1]
 	
 	def _parse_list(self):
 		values = []

@@ -4,6 +4,7 @@
 from ssp.scripting.assembler import Assembler
 from ssp.scripting.source import FileSource
 import argparse
+import sys
 import os
 
 
@@ -41,15 +42,20 @@ def main():
 	else:
 		messages = assembler.disassemble(input_file, output_file)
 
+	exit_code = 0
+
 	if messages is not None and len(messages) > 0:
 		warnings, errors, internal_errors = assembler.get_message_counts()
 		if not args.disasm and (errors + internal_errors) > 0:
 			print("no output generated due to errors")
+			exit_code = -1
 		for msg in messages:
 			print(msg)
 		print("  {} warnings, {} errors, {} internal errors".format(
 			warnings, errors, internal_errors
 		))
+
+	sys.exit(exit_code)
 
 def get_args():
 	parser = argparse.ArgumentParser(
