@@ -6,9 +6,10 @@ import json
 
 class Instruction(object):
 
-	def __init__(self, opcode, parameters):
+	def __init__(self, opcode, parameters, inhibit_argpush=False):
 		self._opcode = opcode
 		self._parameters = parameters
+		self._inhibit_argpush = inhibit_argpush
 
 		self._line = 1
 		self._col = 1
@@ -20,6 +21,10 @@ class Instruction(object):
 	@property
 	def parameters(self):
 		return self._parameters
+
+	@property
+	def inhibit_argpush(self):
+		return self._inhibit_argpush
 
 	def at(self, line, col):
 		self._line = line

@@ -19,6 +19,13 @@ class Parser(object):
 			print("expected identifier at", operation.pos)
 			return None
 
+		peeked_type = self._lexer.peek_token().type if self._lexer.peek_token() else None
+		if peeked_type == TokenType.EXCLAMATION:
+			inhibit_argpush = True
+			self._lexer.get_token()
+		else:
+			inhibit_argpush = False
+
 		parameters = []
 		while not self._lexer.is_eof() and\
 				self._lexer.peek_token().line == operation.line:
@@ -27,7 +34,7 @@ class Parser(object):
 
 		opcode = Opcode.from_string(operation.value)
 
-		return Instruction(opcode, parameters)
+		return Instruction(opcode, parameters, inhibit_argpush=inhibit_argpush)
 
 	def _parse_value(self, token):
 		if token.type == TokenType.IDENTIFIER:

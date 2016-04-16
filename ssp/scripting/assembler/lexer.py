@@ -12,6 +12,7 @@ class TokenType:
 	END_DICT = 8
 	COMMA = 9
 	COLON = 10
+	EXCLAMATION = 11
 
 	@classmethod
 	def from_string(cls, string):
@@ -27,6 +28,7 @@ class TokenType:
 			'END_DICT': cls.END_DICT,
 			'COMMA': cls.COMMA,
 			'COLON': cls.COLON,
+			'EXCLAMATION': cls.EXCLAMATION,
 		}[string.upper()]
 
 	@classmethod
@@ -43,6 +45,7 @@ class TokenType:
 			cls.END_DICT: 'END_DICT',
 			cls.COMMA: 'COMMA',
 			cls.COLON: 'COLON',
+			cls.EXCLAMATION: 'EXCLAMATION',
 		}[integer]
 
 
@@ -118,8 +121,20 @@ class Lexer(object):
 	
 	def _parse_token(self):
 		pre_whitespace = self._skip_whitespace()
+
 		if self._is_eof():
 			return None
+
+		symbols = {
+			'[': TokenType.START_LIST,
+			']': TokenType.END_LIST,
+			'{': TokenType.START_DICT,
+			'}': TokenType.END_DICT,
+			',': TokenType.COMMA,
+			':': TokenType.COLON,
+			'!': TokenType.EXCLAMATION,
+		}
+
 		peeked = self._peek()
 		if peeked.isalpha():
 			return self._parse_identifier(pre_whitespace)
@@ -127,23 +142,8 @@ class Lexer(object):
 			return self._parse_numeric(pre_whitespace)
 		elif peeked == '"':
 			return self._parse_string(pre_whitespace)
-		elif peeked == '[':
-			return self._token(self._pos(), TokenType.START_LIST, self._get())\
-				.with_whitespace(pre_whitespace)
-		elif peeked == ']':
-			return self._token(self._pos(), TokenType.END_LIST, self._get())\
-				.with_whitespace(pre_whitespace)
-		elif peeked == '{':
-			return self._token(self._pos(), TokenType.START_DICT, self._get())\
-				.with_whitespace(pre_whitespace)
-		elif peeked == '}':
-			return self._token(self._pos(), TokenType.END_DICT, self._get())\
-				.with_whitespace(pre_whitespace)
-		elif peeked == ',':
-			return self._token(self._pos(), TokenType.COMMA, self._get())\
-				.with_whitespace(pre_whitespace)
-		elif peeked == ':':
-			return self._token(self._pos(), TokenType.COLON, self._get())\
+		elif peeked in symbols:
+			return self._token(self._pos(), symbols[peeked], self._get())\
 				.with_whitespace(pre_whitespace)
 		else:  # consume unknown stuff so naive consumption still causes exit
 			print("lexer stopped at:", self._get())

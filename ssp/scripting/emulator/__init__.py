@@ -252,9 +252,15 @@ class Emulator(object):
 					"send with 1 argument expects an integer argument"
 				)
 				return
-			values = emu._pop(count + 1, preserve_order=True, collapse_single=False)
+			values = emu._pop(count, preserve_order=True, collapse_single=False)
 			if values is None:
 				return
+			def _as_list(x):
+				if isinstance(x, list):
+					return x
+				else:
+					return [x]
+			values = sum(map(_as_list, values), [])
 			target = values[0]
 			to_send = values[1:]
 		elif len(inst.parameters) == 0:
