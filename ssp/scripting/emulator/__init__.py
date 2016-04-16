@@ -519,6 +519,19 @@ class Emulator(object):
 		emu._advance_inst()
 
 	@staticmethod
+	def _inst_len(emu, inst):
+		target = emu._pop()
+		if target is None:
+			return
+
+		if not isinstance(target, (list, dict)):
+			emu.trigger_error("len expects a list or dictionary target on top of stack")
+			return
+
+		emu._push(len(target))
+		emu._advance_inst()
+
+	@staticmethod
 	def _binop_add(a, b):
 		return a + b
 
@@ -553,5 +566,6 @@ class InstructionSet:
 		Opcode.DUP: (Emulator._inst_dup,),
 		Opcode.LOOKUP: (Emulator._inst_lookup,),
 		Opcode.LIST: (Emulator._inst_list,),
+		Opcode.LEN: (Emulator._inst_len,),
 	}
 

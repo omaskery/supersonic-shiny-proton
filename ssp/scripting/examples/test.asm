@@ -142,6 +142,7 @@ lookup
 pop 1
 
 len		# pops whatever is on top of the stack (list, dict, string, ...?) and pushes it's length/number of elements/whatever makes sense
+pop 1
 
 # example of network send:
 
