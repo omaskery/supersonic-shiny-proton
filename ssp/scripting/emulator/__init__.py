@@ -532,6 +532,16 @@ class Emulator(object):
 		emu._advance_inst()
 
 	@staticmethod
+	def _inst_recv(emu, inst):
+		self._block(BlockingReason.RECV)
+		self._advance_inst()
+
+	@staticmethod
+	def _inst_listen(emu, inst):
+		self._block(BlockingReason.LISTEN)
+		self._advance_inst()
+
+	@staticmethod
 	def _binop_add(a, b):
 		return a + b
 
@@ -567,5 +577,7 @@ class InstructionSet:
 		Opcode.LOOKUP: (Emulator._inst_lookup,),
 		Opcode.LIST: (Emulator._inst_list,),
 		Opcode.LEN: (Emulator._inst_len,),
+		Opcode.RECV: (Emulator._inst_recv,),
+		Opcode.LISTEN: (Emulator._inst_listen,),
 	}
 
