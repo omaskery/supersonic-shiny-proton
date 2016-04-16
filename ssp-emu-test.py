@@ -7,8 +7,8 @@ import argparse
 
 class EmuTest(object):
 
-	def __init__(self, program, debug=False):
-		self._emu = Emulator()
+	def __init__(self, program, debug=False, verbose=0):
+		self._emu = Emulator(verbose=verbose)
 		self._emu.hook_error(self._on_error)
 		self._emu.hook_halted(self._on_halted)
 		self._emu.hook_send(self._on_send)
@@ -16,6 +16,7 @@ class EmuTest(object):
 		self._emu.set_program(program)
 
 		self._debug = debug
+		self._verbose = verbose
 
 		self._services = {
 			'sys': self._svc_sys,
@@ -26,12 +27,12 @@ class EmuTest(object):
 	def test(self):
 		self._emu.resume()
 		while self._emu.running:
-			self._emu.single_step(debug=self._debug)
+			self._emu.single_step()
 			if self._emu.running and self._debug:
 				input("...")
 
-	def _on_error(self, emu, err):
-		print("error:", err)
+	def _on_error(self, emu, err, addr):
+		print("error[0x{:04X}]: {}".format(addr, err))
 
 	def _on_halted(self, emu):
 		print("halted")
@@ -41,7 +42,7 @@ class EmuTest(object):
 		response = None
 		service = self._services.get(target, None)
 		if service is None:
-			emu.trigger_error("unknown target '{}' at {}", target, emu._inst_ptr)
+			emu.trigger_error("unknown target '{}'", target)
 			return
 		response = service(values)
 		if response is not None:
@@ -58,9 +59,7 @@ class EmuTest(object):
 				"your_mom"
 			]
 		else:
-			self._emu.trigger_error("unknown syscall '{}' at {}".format(
-				values, self._emu._inst_ptr
-			))
+			self._emu.trigger_error("unknown syscall '{}'".format(values))
 
 	def _svc_fs(self, values):
 		if len(values) > 0 and values[0] == 'open':
@@ -73,8 +72,8 @@ class EmuTest(object):
 			))
 			return 0
 		else:
-			self._emu.trigger_error("unknown fs operation '{}' at {}".format(
-				values, self._emu._inst_ptr
+			self._emu.trigger_error("unknown fs operation '{}'".format(
+				values
 			))
 
 	def _svc_invoker(self, values):
@@ -87,7 +86,7 @@ def main():
 	program = load_program(args.input)
 	print("loaded {} instructions".format(len(program)))
 
-	test = EmuTest(program, debug=args.debug)
+	test = EmuTest(program, debug=args.debug, verbose=args.verbose)
 	test.test()
 
 
@@ -102,6 +101,10 @@ def get_args():
 	parser.add_argument(
 		'-d', '--debug', action='store_true',
 		help='whether to run emulator in debug mode with waits after each step'
+	)
+	parser.add_argument(
+		'-v', '--verbose', action='count',
+		help='whether to run emulator in verbose mode'
 	)
 	return parser.parse_args()
 

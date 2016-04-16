@@ -67,13 +67,15 @@ class BlockingReason:
 
 class Emulator(object):
 
-	def __init__(self, boot_addr=0):
+	def __init__(self, boot_addr=0, verbose=0):
 		self._stack = []
 		self._program = []
 		self._inst_ptr = boot_addr
 		self._boot_addr = boot_addr
 		self._state = EmulatorState.HALTED
 		self._block_reason = None
+		self._verbose = verbose
+		self._cycles = 0
 
 		self._on_error = None
 		self._on_halt = None
@@ -95,7 +97,7 @@ class Emulator(object):
 	def trigger_error(self, info):
 		self.halt()
 		if self._on_error is not None:
-			self._on_error(self, info)
+			self._on_error(self, info, self._inst_ptr)
 
 	def set_program(self, program):
 		self._program = program
@@ -112,12 +114,14 @@ class Emulator(object):
 		)
 
 		if self._blocking_reason not in receive_reasons:
-			print("receive dropped (block state: {})".format(
-				self._blocking_reason
-			))
+			if self._verbose:
+				print("receive dropped (block state: {})".format(
+					self._blocking_reason
+				))
 			return
 
-		print("received {} from {}".format(values, sender))
+		if self._verbose:
+			print("received {} from {}".format(values, sender))
 		# pushing values first and sender last on the assumption that
 		# you will more often want to discard the sender than the values
 		# so it is more ergonomic to do "POP" than "SWAP; POP"
@@ -153,8 +157,9 @@ class Emulator(object):
 		self._blocking_reason = None
 		self._stack.clear()
 		self._inst_ptr = self._boot_addr
+		self._cycles = 0
 
-	def single_step(self, debug=False):
+	def single_step(self):
 		if self.halted or self.blocked:
 			return
 
@@ -168,12 +173,12 @@ class Emulator(object):
 		if handler is None:
 			name = Opcode.to_string(inst.opcode)
 			if name is not None:
-				self.trigger_error("unimplemented opcode {} at {}".format(
-					name, self._inst_ptr
+				self.trigger_error("unimplemented opcode {}".format(
+					name
 				))
 			else:
-				self.trigger_error("unknown opcode {} at {}".format(
-					inst.opcode, self._inst_ptr
+				self.trigger_error("unknown opcode {}".format(
+					inst.opcode
 				))
 			return
 
@@ -181,10 +186,10 @@ class Emulator(object):
 		extra = handler[1:]
 		arguments = tuple([self, inst] + list(extra))
 
-		if debug:
-			print("[{}] executing: {}".format(self._inst_ptr, inst))
+		if self._verbose:
+			print("[0x{:04X}] executing: {}".format(self._inst_ptr, inst))
 		fn(*arguments)
-		if debug:
+		if self._verbose > 1:
 			print("stack:", self._stack)
 
 	def many_step(self, n):
@@ -210,8 +215,8 @@ class Emulator(object):
 	def _pop(self, n=1, preserve_order=False, collapse_single=True):
 		if len(self._stack) < n:
 			self.trigger_error(
-				"attempted to pop {} with only {} on stack at {}".format(
-					n, len(self._stack), self._inst_ptr
+				"attempted to pop {} with only {} on stack".format(
+					n, len(self._stack)
 				)
 			)
 			return None
@@ -242,8 +247,8 @@ class Emulator(object):
 	@staticmethod
 	def _inst_push(emu, inst):
 		if len(inst.parameters) != 1:
-			emu.trigger_error("push at {} expected 1 argument, got {}".format(
-				emu._inst_ptr, len(inst.parameters)
+			emu.trigger_error("push expected 1 argument, got {}".format(
+				len(inst.parameters)
 			))
 		else:
 			emu._push(inst.parameters[0])
@@ -284,8 +289,8 @@ class Emulator(object):
 			target = values[0]
 			to_send = values[1:]
 		else:
-			emu.trigger_error("send at {} expected 1 argument, got {}".format(
-				emu._inst_ptr, len(inst.parameters)
+			emu.trigger_error("send expected 1 argument, got {}".format(
+				len(inst.parameters)
 			))
 			return
 		emu._send(target, to_send, block)
@@ -298,27 +303,19 @@ class Emulator(object):
 			emu._stack[-1] = emu._stack[-2]
 			emu._stack[-2] = temp
 		else:
-			emu.trigger_error("swap at {} had stack <2 big".format(
-				emu._inst_ptr
-			))
+			emu.trigger_error("swap had stack <2 big")
 			return
 		emu._advance_inst()
 
 	@staticmethod
 	def _inst_append(emu, inst):
 		if len(inst.parameters) != 1:
-			emu.trigger_error(
-				"append requires one integer pop count argument at {}".format(
-					emu._inst_ptr
-				)
-			)
+			emu.trigger_error("append requires one integer pop count argument")
 			return
 		
 		pop_count = inst.parameters[0]
 		if not isinstance(pop_count, int):
-			emu.trigger_error("append at {} expects a single integer pop count".format(
-				emu._inst_ptr
-			))
+			emu.trigger_error("append expects a single integer pop count")
 			return
 
 		values = emu._pop(pop_count, preserve_order=True, collapse_single=False)
@@ -328,9 +325,7 @@ class Emulator(object):
 		top = emu._pop()
 		if not isinstance(top, list):
 			emu.trigger_error(
-				"append at {} expects top of stack (under args) to be a list".format(
-					emu._inst_ptr
-				)
+				"append at {} expects top of stack (under args) to be a list"
 			)
 			return
 
