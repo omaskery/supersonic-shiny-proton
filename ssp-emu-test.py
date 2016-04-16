@@ -20,6 +20,7 @@ class EmuTest(object):
 		self._services = {
 			'sys': self._svc_sys,
 			'fs': self._svc_fs,
+			'.': self._svc_invoker,
 		}
 
 	def test(self):
@@ -39,9 +40,10 @@ class EmuTest(object):
 		print("sending:", values, "to", target)
 		response = None
 		service = self._services.get(target, None)
-		response = service(values) if service else None
 		if service is None:
-			print("unknown target")
+			emu.trigger_error("unknown target '{}' at {}", target, emu._inst_ptr)
+			return
+		response = service(values)
 		if response is not None:
 			print("responding to emu:", response)
 			emu.receive(target, response)
@@ -56,13 +58,20 @@ class EmuTest(object):
 				"your_mom"
 			]
 		else:
-			print("unknown syscall")
+			self._emu.trigger_error("unknown syscall '{}' at {}".format(
+				values, self._emu._inst_ptr
+			))
 
 	def _svc_fs(self, values):
 		if len(values) > 0 and values[0] == 'open':
 			return 0
 		else:
-			print("unknown fs operation")
+			self._emu.trigger_error("unknown fs operation '{}' at {}".format(
+				values, self._emu._inst_ptr
+			))
+
+	def _svc_invoker(self, values):
+		print("to invoker:", " ".join(map(str, values)))
 
 
 def main():
