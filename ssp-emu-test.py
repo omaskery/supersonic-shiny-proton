@@ -38,16 +38,45 @@ class EmuTest(object):
 		print("halted")
 
 	def _on_send(self, emu, target, values):
-		print("sending:", values, "to", target)
-		response = None
-		service = self._services.get(target, None)
-		if service is None:
-			emu.trigger_error("unknown target '{}'", target)
-			return
-		response = service(values)
+		remote = EmuTest._parse_remote_target(target)
+		if remote is None:
+			response = self._handle_syscall(emu, target, values)
+		else:
+			response = self._handle_remote_send(emu, remote, values)
 		if response is not None:
 			print("responding to emu:", response)
 			emu.receive(target, response)
+
+	def _handle_syscall(self, emu, target, values):
+		print("syscall [{}]: {}".format(target, ", ".join(map(str, values))))
+		service = self._services.get(target, None)
+		if service is None:
+			emu.trigger_error("unknown target or malformed remote: '{}'".format(target))
+			return
+		return service(values)
+
+	def _handle_remote_send(self, emu, remote, values):
+		print("remote send [octets: {} port: {}]: {}".format(
+			".".join(map(str, remote[0])), remote[1],
+			", ".join(map(str, values))
+		))
+
+	@staticmethod
+	def _parse_remote_target(target):
+		if ':' not in target:
+			return None
+		ip, port = target.split(":", 1)
+		if '.' not in ip:
+			return None
+		octets = ip.split(".")
+		if len(octets) != 4:
+			return None
+		try:
+			octets = list(map(int, octets))
+			port = int(port)
+		except:
+			return None
+		return (octets, port)
 
 	def _on_block(self, emu, reason):
 		print("blocked on", BlockingReason.to_string(reason))

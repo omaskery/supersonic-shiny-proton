@@ -146,7 +146,9 @@ pop 1
 
 # example of network send:
 
-# assume some script is on top of the stack (loaded from FS or received from elsewhere...)
+# some data to send
+push ["stand", "in", "for", "some", "bytecode", "here"]
+# some target destination
 push ["1.2.3.4:22"]
 swap
 push 1
