@@ -12,7 +12,6 @@ class TokenType:
 	END_DICT = 8
 	COMMA = 9
 	COLON = 10
-	EXCLAMATION = 11
 
 	@classmethod
 	def from_string(cls, string):
@@ -28,8 +27,7 @@ class TokenType:
 			'END_DICT': cls.END_DICT,
 			'COMMA': cls.COMMA,
 			'COLON': cls.COLON,
-			'EXCLAMATION': cls.EXCLAMATION,
-		}[string.upper()]
+		}.get(string.upper(), None)
 
 	@classmethod
 	def to_string(cls, integer):
@@ -45,8 +43,17 @@ class TokenType:
 			cls.END_DICT: 'END_DICT',
 			cls.COMMA: 'COMMA',
 			cls.COLON: 'COLON',
-			cls.EXCLAMATION: 'EXCLAMATION',
-		}[integer]
+		}.get(integer, None)
+
+	@classmethod
+	def to_type_name(cls, integer):
+		return {
+			cls.INTEGER: 'integer',
+			cls.REAL: 'real',
+			cls.STRING: 'string',
+			cls.START_LIST: 'list',
+			cls.START_DICT: 'dictionary',
+		}.get(integer, None)
 
 
 class Token(object):
@@ -132,7 +139,6 @@ class Lexer(object):
 			'}': TokenType.END_DICT,
 			',': TokenType.COMMA,
 			':': TokenType.COLON,
-			'!': TokenType.EXCLAMATION,
 		}
 
 		peeked = self._peek()
@@ -219,9 +225,11 @@ class Lexer(object):
 			numeric += self._get()
 
 		converter, token_type = specials[seen_special]
+		value = converter(numeric)
+		if is_negative:
+			value = -value
 
-		return self._token(pos, token_type, converter(numeric))\
-			.with_whitespace(pre_whitespace)
+		return self._token(pos, token_type, value).with_whitespace(pre_whitespace)
 
 	def _pos(self):
 		return self._line, self._col

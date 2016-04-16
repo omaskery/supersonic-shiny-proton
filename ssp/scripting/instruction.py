@@ -6,10 +6,9 @@ import json
 
 class Instruction(object):
 
-	def __init__(self, opcode, parameters, inhibit_argpush=False):
+	def __init__(self, opcode, parameters):
 		self._opcode = opcode
 		self._parameters = parameters
-		self._inhibit_argpush = inhibit_argpush
 
 		self._line = 1
 		self._col = 1
@@ -23,8 +22,12 @@ class Instruction(object):
 		return self._parameters
 
 	@property
-	def inhibit_argpush(self):
-		return self._inhibit_argpush
+	def line(self):
+		return self._line
+
+	@property
+	def col(self):
+		return self._col
 
 	def at(self, line, col):
 		self._line = line
@@ -32,7 +35,11 @@ class Instruction(object):
 		return self
 
 	def pretty_string(self):
-		tokens = [Opcode.to_string(self._opcode)]
+		opcode_str = Opcode.to_string(self._opcode)
+		if opcode_str is None:
+			opcode_str = "unknown_opcode_0x{:02X}".format(self._opcode)
+		tokens = [opcode_str]
+
 		for index, param in enumerate(self.parameters):
 			last = index == len(self.parameters) - 1
 			if not last:
@@ -40,6 +47,7 @@ class Instruction(object):
 			else:
 				param_str = json.dumps(param, indent=4)
 			tokens.append(param_str)
+
 		return " ".join(tokens)
 
 	def __str__(self):

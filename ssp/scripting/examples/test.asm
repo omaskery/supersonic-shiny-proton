@@ -1,18 +1,17 @@
 
-# a note on the assembly language:
+# note on this assembly language:
 #
-# with the exception of PUSH, all instructions have no arguments and are translated into
-# a series of pushes (referred to hereafter as the ARGPUSH RULE), for example:
+# all instructions except PUSH can apply the "argpush" rule. this rule takes all
+# parameters and turns them into pushes instead, followed by pushing the number of values
 #
 # add 10 15
 #
-# will compile to:
+# after applying the argpush rule becomes:
 #
 # push 10
 # push 15
-# add! 2  # note the ! after the instruction inhibits the ARGPUSH rule
-#
-# the "extra" 2 put after the add tells add how many variables were pushed before it
+# push 2
+# add
 
 # example of ls:
 
@@ -24,8 +23,10 @@ pop
 push ["."]
 # stack is now [..., ls result, ["."]]
 swap
-# stack is now [..., ["."], ls result]]
-append! 1
+# stack is now [..., ["."], ls result]
+push 1
+# stack is now [..., ["."], ls result, 1]
+append
 # stack is now [..., [".", ls result]], sendi will now send the top result
 # sendi ignores the response (should it still block? :S how to handle response otherwise?)
 # when you send to target "." this means "send to the invoker of this process", typically
@@ -45,27 +46,34 @@ push ["fs", "write"]
 # swap the list we just pushed, and the file handle that should be beneath it
 swap
 # use append to pop the file handle and add it to the list just below it
-append! 1
+push 1
+append
 # stack should now be [..., data, ["fs", "write", file handle]] so swap data up to top
 swap
 # stack should now be [..., ["fs", "write", file handle], data] so append data to list
-append! 1
+push 1
+append
 # stack should now be [..., ["fs", "write", file handle, data]] so send this on to fs
 send
 # drop the sender and return code from write
-pop! 2
+push 2
+pop 2
 
 # example of arithmetic (usual stack machine affair):
 
+push 10
+push 15
 # pop 2 top values, add them and push the result to the stack
-add 10 15
+add
 pop
 
 # imagine the other operators yourself
 
-# example of complex types:
+# example of creating a dict on top of the stack:
 
-dict "john" 42 # (taking advantage of the argpush rule)
+push "john"
+push 42
+dict 1
 
 # or
 push {"john": 42}
@@ -74,17 +82,18 @@ push {"john": 42}
 push {}		# push an empty dictionary onto the stack
 push "john"	# push the literal "john"
 push 42		# push the literal 42
+push 1
 put		# pops the key ("john") and value (42) pair off the stack and puts them into the dictionary left on top of the stack (popping the dictionary at the top)
 
-# or
-push {}
-put "john" 42 # variation of previous but using the argpush rule
+# looking up a value in a dict:
 
 push "john"
+push 1
 lookup		# pops the key ("john") off the stack and looks it up in the dictionary on the top of the stack (pops the dictionary, too), pushes the result
 
 # can also be written:
-lookup "john"
+push "john"
+lookup
 
 # list examples:
 
@@ -95,11 +104,8 @@ push [1, 2, 3]
 push 1
 push 2
 push 3
-list! 3
-
-# or
-
-list 1 2 3 # uses the argpush rule
+push 3
+list
 
 # or
 
@@ -107,17 +113,24 @@ push []		# push an empty list onto the stack
 push 1
 push 2
 push 3
-append! 3	# appends 3 items from the stack to the list it assumes is 'under' them, also for giggles it will append them IN THE ORDER PUSHED
+push 3
+append # appends 3 items from the stack to the list it assumes is 'under' them, also for giggles it will append them IN THE ORDER PUSHED
 
-# or
+# or 
 
-push []
-append 1 2 3
+push []		# push an empty list onto the stack
+push 1
+push 2
+push 3
+append 3	# appends 3 items from the stack to the list it assumes is 'under' them, also for giggles it will append them IN THE ORDER PUSHED
+
+# indexing into a list can be done as follows:
 
 lookup 0	# pushes the 0th element from a list on top of the stack (popping the list first)
 
 # can also be written
 push 0
+push 1
 lookup
 
 len		# pops whatever is on top of the stack (list, dict, string, ...?) and pushes it's length/number of elements/whatever makes sense
@@ -125,8 +138,10 @@ len		# pops whatever is on top of the stack (list, dict, string, ...?) and pushe
 # example of network send:
 
 # assume some script is on top of the stack (loaded from FS or received from elsewhere...)
-swap ["1.2.3.4:22"]
-append! 1
+push ["1.2.3.4:22"]
+swap
+push 1
+append
 send			# pops the value from top of stack, identifies that target is a remote machine and sends popped values to that remote machine
 
 # example of receiving from another process:

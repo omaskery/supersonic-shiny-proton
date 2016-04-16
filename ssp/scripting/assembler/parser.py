@@ -19,13 +19,6 @@ class Parser(object):
 			print("expected identifier at", operation.pos)
 			return None
 
-		peeked_type = self._lexer.peek_token().type if self._lexer.peek_token() else None
-		if peeked_type == TokenType.EXCLAMATION:
-			inhibit_argpush = True
-			self._lexer.get_token()
-		else:
-			inhibit_argpush = False
-
 		parameters = []
 		while not self._lexer.is_eof() and\
 				self._lexer.peek_token().line == operation.line:
@@ -34,24 +27,32 @@ class Parser(object):
 
 		opcode = Opcode.from_string(operation.value)
 
-		return Instruction(opcode, parameters, inhibit_argpush=inhibit_argpush)
+		return Instruction(opcode, parameters).at(operation.line, operation.col)
 
 	def _parse_value(self, token):
-		if token.type == TokenType.IDENTIFIER:
-			print("don't know what to do with identifiers here yet", token.pos)
-		elif token.type in (TokenType.INTEGER, TokenType.REAL, TokenType.STRING):
-			return token.value
-		elif token.type == TokenType.START_LIST:
-			return self._parse_list()
-		elif token.type == TokenType.START_DICT:
-			return self._parse_dict()
-		else:
-			print("unexpected token", token)
+		result = [token.type, None]
+		mapping = [
+			((TokenType.IDENTIFIER,), None),
+			((TokenType.INTEGER, TokenType.REAL, TokenType.STRING,),
+				lambda token: token.value),
+			((TokenType.START_LIST,), lambda token: self._parse_list()),
+			((TokenType.START_DICT,), lambda token: self._parse_dict()),
+		]
+		for types, handler in mapping:
+			if token.type in types:
+				if handler is None:
+					print("don't know what to do with {} types yet".format(
+						TokenType.to_string(token.type)
+					))
+				else:
+					result[1] = handler(token)
+				break
+		return tuple(result)
 	
 	def _parse_list(self):
 		values = []
 		first = True
-		while self._lexer.peek_token().type != TokenType.END_LIST:
+		while self._lexer.peek_token() and self._lexer.peek_token().type != TokenType.END_LIST:
 			if not first:
 				comma = self._lexer.get_token()
 				if comma.type != TokenType.COMMA:

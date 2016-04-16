@@ -37,10 +37,19 @@ def main():
 	source = FileSource(input_file, args.input)
 	assembler = Assembler()
 	if not args.disasm:
-		assembler.assemble(source, output_file)
+		messages = assembler.assemble(source, output_file)
 	else:
-		assembler.disassemble(input_file, output_file)
+		messages = assembler.disassemble(input_file, output_file)
 
+	if messages is not None and len(messages) > 0:
+		warnings, errors, internal_errors = assembler.get_message_counts()
+		if not args.disasm and (errors + internal_errors) > 0:
+			print("no output generated due to errors")
+		for msg in messages:
+			print(msg)
+		print("  {} warnings, {} errors, {} internal errors".format(
+			warnings, errors, internal_errors
+		))
 
 def get_args():
 	parser = argparse.ArgumentParser(

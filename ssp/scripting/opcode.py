@@ -43,7 +43,7 @@ class Opcode:
 			'LOOKUP': cls.LOOKUP,
 			'LEN': cls.LEN,
 			'POP': cls.POP,
-		}[string.upper()]
+		}.get(string.upper(), None)
 
 	@classmethod
 	def to_string(cls, integer):
@@ -67,5 +67,5 @@ class Opcode:
 			cls.LOOKUP: 'LOOKUP',
 			cls.LEN: 'LEN',
 			cls.POP: 'POP',
-		}[integer]
+		}.get(integer, None)
 
