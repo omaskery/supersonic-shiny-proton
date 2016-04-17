@@ -1,4 +1,4 @@
-
+import logging
 
 from ..opcode import Opcode
 from ..instruction import Instruction
@@ -66,6 +66,7 @@ class BlockingReason:
 
 
 class Emulator(object):
+	logger = logging.getLogger(__name__)
 
 	def __init__(self, boot_addr=0, verbose=0):
 		self._stack = []
@@ -125,19 +126,19 @@ class Emulator(object):
 		)
 
 		if self._blocking_reason not in receive_reasons:
-			if self._verbose:
-				print("receive dropped (block state: {})".format(
-					self._blocking_reason
-				))
+			self.logger.debug("receive dropped (block state: {})".format(
+				self._blocking_reason
+			))
 			return
 
-		if self._verbose:
-			print("received {} from {}".format(values, sender))
+		self.logger.debug("received {} from {}".format(values, sender))
 		# pushing values first and sender last on the assumption that
 		# you will more often want to discard the sender than the values
 		# so it is more ergonomic to do "POP" than "SWAP; POP"
 		self._push(values)
-		self._push(sender)
+
+		if self._blocking_reason != BlockingReason.SEND_RESP:
+			self._push(sender)
 
 		self.resume()
 
@@ -197,11 +198,10 @@ class Emulator(object):
 		extra = handler[1:]
 		arguments = tuple([self, inst] + list(extra))
 
-		if self._verbose:
-			print("[0x{:04X}] executing: {}".format(self._inst_ptr, inst))
+		self.logger.debug("[0x{:04X}] executing: {}".format(self._inst_ptr, inst))
 		fn(*arguments)
 		if self._verbose > 1:
-			print("stack:", ", ".join(map(str, self._stack)))
+			self.logger.debug("stack: {}".format(", ".join(map(str, self._stack))))
 
 	def many_step(self, n):
 		for _ in range(n):
