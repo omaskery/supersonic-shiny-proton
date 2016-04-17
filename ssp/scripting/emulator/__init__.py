@@ -81,6 +81,11 @@ class Emulator(object):
 		self._on_halt = None
 		self._on_send = None
 		self._on_block = None
+		self._on_resume = None
+
+	@property
+	def state(self):
+		return self._state
 
 	def hook_error(self, handler):
 		self._on_error = handler
@@ -93,6 +98,9 @@ class Emulator(object):
 
 	def hook_block(self, handler):
 		self._on_block = handler
+		
+	def hook_resume(self, handler):
+		self._on_resume = handler
 
 	def trigger_error(self, info):
 		self.halt()
@@ -103,6 +111,10 @@ class Emulator(object):
 		self._program = program
 
 	def resume(self):
+		print('resume {} {}'.format(self._state, self._on_resume))
+		if (self._state != EmulatorState.RUNNING) and (self._on_resume is not None):
+			self._on_resume(self)
+	
 		self._blocking_reason = None
 		self._state = EmulatorState.RUNNING
 

@@ -1,10 +1,18 @@
 import aioh2
 import ssl
 import logging
+import json
+import collections
+
+import sys
+
+# For Auth
+import ssp.server.net.h2
+h2 = ssp.server.net.h2
 
 def _make_method_fn(method):
-    async def method_fn(self, path, payload=None):
-        return await self.request(method, path, payload)
+    async def method_fn(self, *a, **kw):
+        return await self.request(method, *a, **kw)
     return method_fn
 
 class Response(object):
@@ -37,12 +45,25 @@ class Client(object):
     for k,v in METHODS.items():
         locals()[k] = _make_method_fn(v)
 
-    async def request(self, method, path, payload=None):
+    async def request(self, method, path, payload=None, auth=None):
         self.logger.info('{} {}'.format(method, path))
-        stream_id = await self.client.start_request({
+        headers = {
             ':method': method,
             ':path': path,
-            })
+        }
+
+        if auth is not None:
+            h2.sign_machine_auth(headers, *auth)
+
+        special_headers = []
+        normal_headers = []
+        for k, v in headers.items():
+            if k.startswith(':'):
+                special_headers.append((k, v))
+            else:
+                normal_headers.append((k, v))
+        
+        stream_id = await self.client.start_request(special_headers + normal_headers)
 
         self.logger.debug('Started')
         await self.client.send_data(stream_id, payload or b'', end_stream=True)
@@ -51,10 +72,19 @@ class Client(object):
         self.logger.debug('Headers: {}'.format(headers))
         body = await self.client.read_stream(stream_id, -1)
         self.logger.debug('Body: {}'.format(body))
+        
+        headers = collections.OrderedDict(headers)
+        jsonBody = None
+        
+        if headers.get('content-type').lower() == 'application/json':
+            bodyStr = body.decode('utf-8').strip()
+            if len(bodyStr) > 0:
+                jsonBody = json.loads(body.decode('utf-8'))
 
         resp = Response()
         resp.headers = headers
         resp.body = body
+        resp.json = jsonBody
         return resp
         
 
