@@ -1,11 +1,16 @@
 import os
 import aioh2
 import asyncio
-import ssl
 import collections
-import re
+import io
 import json
 import logging
+import re
+import ssl
+import sys
+
+import ssp.scripting.emulator
+emu = ssp.scripting.emulator
 
 from OpenSSL import crypto, SSL
 from socket import gethostname
@@ -97,14 +102,14 @@ def _verify_machine_auth(server, headers):
 
     return machine
         
-def server_verify_machine_auth(server, proto, stream_id, headers, fatal=True):
+async def server_verify_machine_auth(server, proto, stream_id, headers, fatal=True):
     machine = _verify_machine_auth(server, headers)
     if fatal and (machine is None):
-        proto.send_headers(stream_id, (
+        await proto.send_headers(stream_id, (
             (':status', '401'),
             ('content-type', 'application/json'),
         ))
-        proto.send_data(stream_id, b'{}', end_stream=True)
+        await proto.send_data(stream_id, b'{}', end_stream=True)
         return
 
     return machine
@@ -126,11 +131,14 @@ async def new_machine(server, proto, match, headers, stream_id):
 
 @post('/machines/([^/]*)/start-process')
 async def machine_start_process(server, proto, match, headers, stream_id):
-    mach = server_verify_machine_auth(server, proto, stream_id, headers)
+    mach = await server_verify_machine_auth(server, proto, stream_id, headers)
     if mach is None:
         return
 
-    proc = mach.start_process(b'')
+    payload = await proto.read_stream(stream_id, -1)
+    file = io.BytesIO(payload)
+    program = emu.load_program(file)
+    proc = mach.start_process(program)
     
     response_headers = (
         (':status', '200'),
@@ -161,23 +169,30 @@ class H2Server(object):
 
     async def handle_request(self, proto, stream_id, headers):
         headers = collections.OrderedDict(headers)
-        
-        done = False
-        for route in ROUTES:
-            fn = route(self.server, proto, headers, stream_id)
-            if (fn is not None):
-                await fn()
-                done = True
-                break
-            
-        if done is True:
-            return
 
-        logger.debug('404: {} {}'.format(headers.get(':method', ''), headers.get(':path', '')))
-        response_headers = (
-            (':status', '404'),
-        )
-        proto.send_headers(stream_id, response_headers, end_stream=True)
+        try:
+            done = False
+            for route in ROUTES:
+                fn = route(self.server, proto, headers, stream_id)
+                if (fn is not None):
+                    await fn()
+                    done = True
+                    break
+            
+            if done is True:
+                return
+
+            logger.debug('404: {} {}'.format(headers.get(':method', ''), headers.get(':path', '')))
+            response_headers = (
+                (':status', '404'),
+            )
+            proto.send_headers(stream_id, response_headers, end_stream=True)
+        except:
+            sys.excepthook(*sys.exc_info())
+            response_headers = (
+                (':status', '500'),
+            )
+            proto.send_headers(stream_id, response_headers, end_stream=True)
 
     async def handle_client(self, proto):
         while not self.exiting:

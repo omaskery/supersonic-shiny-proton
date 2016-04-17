@@ -38,7 +38,7 @@ class EmuProcess(Process):
         if target == ".":
             target = self.ppid
 
-        self.logger.info("sending:", values, "to", target)
+        self.logger.info("sending {} to {}".format(values, target))
         
         try:
             ret = self.machine.send_ipc(self, target, values)
@@ -47,7 +47,7 @@ class EmuProcess(Process):
             emu.trigger_error('error sending: {}'.format(repr(e)))
         
     def _on_block(self, e, reason):
-        self.logger.debug("blocked on", emu.BlockingReason.to_string(reason))
+        self.logger.debug("blocked on {}".format(emu.BlockingReason.to_string(reason)))
         self.machine.unregister_tick(self.tick_id)
 
     def _on_resume(self, e):
