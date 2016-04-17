@@ -102,9 +102,9 @@ def _verify_machine_auth(server, headers):
 
     return machine
         
-async def server_verify_machine_auth(server, proto, stream_id, headers, fatal=True):
+async def server_verify_machine_auth(server, proto, stream_id, headers, fatal=True, expected_id=None):
     machine = _verify_machine_auth(server, headers)
-    if fatal and (machine is None):
+    if fatal and ((machine is None) or ((expected_id is not None) and (machine.id != expected_id))):
         await proto.send_headers(stream_id, (
             (':status', '401'),
             ('content-type', 'application/json'),
@@ -131,7 +131,7 @@ async def new_machine(server, proto, match, headers, stream_id):
 
 @post('/machines/([^/]*)/start-process')
 async def machine_start_process(server, proto, match, headers, stream_id):
-    mach = await server_verify_machine_auth(server, proto, stream_id, headers)
+    mach = await server_verify_machine_auth(server, proto, stream_id, headers, expected_id=match.group(1))
     if mach is None:
         return
 
@@ -145,6 +145,27 @@ async def machine_start_process(server, proto, match, headers, stream_id):
         ('content-type', 'application/json'),
     )
     await proto.send_headers(stream_id, response_headers, end_stream=True)
+    
+@post('/machines/([^/]*)/send/([^/]*)')
+async def machine_send(server, proto, match, headers, stream_id):
+    mach = await server_verify_machine_auth(server, proto, stream_id, headers, expected_id=match.group(1))
+    if mach is None:
+        return
+
+    target = match.group(2)
+    payload = await proto.read_stream(stream_id, -1)
+    values = json.loads(payload.decode('utf-8'))
+    ret = mach.interface_send(target, values)
+    
+    response_headers = (
+        (':status', '200'),
+        ('content-type', 'application/json'),
+    )
+    await proto.send_headers(stream_id, response_headers)
+    await proto.send_data(stream_id, json.dumps({
+        'success': True,
+        'result': ret,
+        }).encode('utf-8'), end_stream=True)
 
 class H2Server(object):
     def __init__(self, server):
@@ -190,7 +211,8 @@ class H2Server(object):
             response_headers = [
                 (':status', '500'),
             ]
-            await proto.send_headers(stream_id, response_headers, end_stream=True)
+            await proto.send_headers(stream_id, response_headers)
+            await proto.send_data(stream_id, repr(sys.exc_info()[0]).encode('utf-8'), end_stream=True)
             raise
 
     async def handle_client(self, proto):

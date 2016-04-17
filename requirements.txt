@@ -2,3 +2,5 @@ msgpack-python==0.4.7
 h2==2.2.2
 pyOpenSSL==16.0.0
 aioh2==0.1.0
+appdirs==1.4.0
+PyYAML==3.11

@@ -16,7 +16,9 @@ def _make_method_fn(method):
     return method_fn
 
 class Response(object):
-    pass
+    def __str__(self):
+        return '<Response {}: [{}] {}>'.format(self.status, self.headers, self.body)
+    __repr__ = __str__
 
 class Client(object):
     logger = logging.getLogger(__name__)
@@ -82,6 +84,7 @@ class Client(object):
                 json_body = json.loads(body.decode('utf-8'))
 
         resp = Response()
+        resp.status = int(headers.get(':status', '600'))
         resp.headers = headers
         resp.body = body
         resp.json = json_body

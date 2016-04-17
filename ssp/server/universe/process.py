@@ -25,6 +25,10 @@ class EmuProcess(Process):
     def __init__(self, machine, pid, ppid):
         super(EmuProcess, self).__init__(machine, pid, ppid)
 
+        self.steps_per_tick = 150
+        self.receive_future = None
+        self.receive_sender = None
+
         self.emu = emu.Emulator(verbose=100)
         self.emu.logger = self.logger
         self.emu.hook_error(self._on_error)
@@ -41,7 +45,10 @@ class EmuProcess(Process):
                 
     def _on_send(self, emu, target, values):
         if target == ".":
-            target = self.ppid
+            target = str(self.ppid)
+        elif (self.receive_future is not None) and (target == self.receive_sender):
+            self.receive_future.set_result(values)
+            return
 
         self.logger.info("sending {} to {}".format(values, target))
 
@@ -53,7 +60,7 @@ class EmuProcess(Process):
             
             emu.receive(None, future.result())
         
-        future = asyncio.get_event_loop().create_task(self.machine.send_ipc(self, target, values))
+        future = asyncio.get_event_loop().create_task(self.machine.send_ipc(str(self.pid), target, values))
         if self.emu.blocked:
             future.add_done_callback(done)
         
@@ -61,16 +68,26 @@ class EmuProcess(Process):
         self.logger.debug("blocked on {}".format(emu.BlockingReason.to_string(reason)))
         self.machine.unregister_tick(self.tick_id)
 
+        if reason in (emu.BlockingReason.RECV, emu.BlockingReason.LISTEN):
+            self.receive_future = asyncio.Future()
+
     def _on_resume(self, e):
         self.tick_id = self.machine.register_tick(self._on_tick)
 
     def _on_tick(self):
-        self.emu.single_step()
+        for _ in range(self.steps_per_tick):
+            self.emu.single_step()
+            if self.emu.blocked:
+                break
 
     async def send_ipc(self, sender, values):
         self.logger.debug('receive {}, {}'.format(sender, values))
+        if self.receive_future is None:
+            return
+
+        self.receive_sender = sender
         self.emu.receive(sender, values)
-        return None # TODO: send responses
+        return await self.receive_future
 
     def run_program(self, program):
         if self.emu.state == emu.EmulatorState.HALTED:

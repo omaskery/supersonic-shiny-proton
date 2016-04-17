@@ -40,6 +40,9 @@ class Machine(object):
         
         return (proc, parent)
 
+    def interface_send(self, target, values):
+        pass
+
     def register_service(self, proc, service):
         self.services[service] = proc
 
@@ -61,12 +64,8 @@ class Machine(object):
                 raise Exception('destination machine {} not found'.format(addr[0]))
             return await dest.send_ipc('{}:{}'.format(self.id, sender), addr[1], values)
 
-        if not isinstance(sender, (str, int)):
-            sender = sender.pid
-
-        if isinstance(target, str) and len(target) > 0:
-            if target[0] in string.digits:
-                target = int(target)
+        if (len(target) > 0) and (target[0] in string.digits):
+            target = int(target)
         
         if target in self.processes:
             return await self.processes[target].send_ipc(sender, values)
