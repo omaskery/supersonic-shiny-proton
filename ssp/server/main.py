@@ -37,7 +37,7 @@ def main(args=None):
     logger.info('Starting server')
 
     server.start()
-    coro = loop.create_server(h2.h2_protocol(loop, server), args.bind, args.port, ssl=h2.create_ssl_context())
+    coro = loop.create_task(h2.start_server(server, host=args.bind, port=args.port))
     h2_server = loop.run_until_complete(coro)
 
     logger.info('Server running on {}'.format(h2_server.sockets[0].getsockname()))
@@ -48,8 +48,7 @@ def main(args=None):
 
     logger.info('Stopping server')
 
-    h2_server.close()
-    loop.run_until_complete(h2_server.wait_closed())
+    loop.run_until_complete(h2_server.close())
 
     server.stop()
     loop.run_until_complete(server.wait_finished())

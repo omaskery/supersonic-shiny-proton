@@ -1,4 +1,5 @@
 import os
+import aioh2
 import asyncio
 import ssl
 import collections
@@ -6,6 +7,10 @@ import re
 import json
 import logging
 
+from OpenSSL import crypto, SSL
+from socket import gethostname
+
+# These are used by the auth code.
 import hmac
 import hashlib
 import random
@@ -48,48 +53,118 @@ def verify_machine_auth(headers, id, key):
     logger.warning('signing error for {}'.format(machine))
     return None
 
-from h2.connection import H2Connection
-from h2.events import RequestReceived
+ROUTES = []
 
-from OpenSSL import crypto, SSL
-from socket import gethostname
+# Magical route-making helper.
+def endpoint(routes, method=None):
+    def endpoint(regex):
+        def endpoint(fn):
+            rx = re.compile(regex)
+                    
+            def route(server, proto, headers, stream_id):
+                match = rx.fullmatch(headers[':path'])
+                if match is None:
+                    return None
 
-class Route(object):
-    pass
+                if method is not None and headers[':method'] != method:
+                    return None
 
-class H2Protocol(asyncio.Protocol):
-    ROUTES = []
+                return lambda: fn(server, proto, match, headers, stream_id)
+
+            routes.append(route)
+        return endpoint
+    return endpoint
+
+for k,v in {
+        'get': 'GET',
+        'post': 'POST',
+        }.items():
+    locals()[k] = endpoint(ROUTES, v)
+endpoint = endpoint(ROUTES)
+
+def _verify_machine_auth(server, headers):
+    machine = headers.get('machine')
+    if machine is None:
+        return None
+        
+    machine = server.universe.machines.get(machine)
+    if machine is None:
+        return None
+
+    mach_id = verify_machine_auth(headers, machine.id, machine.secret)
+    if mach_id is None:
+        return None
+
+    return machine
+        
+def server_verify_machine_auth(server, proto, stream_id, headers, fatal=True):
+    machine = _verify_machine_auth(server, headers)
+    if fatal and (machine is None):
+        proto.send_headers(stream_id, (
+            (':status', '401'),
+            ('content-type', 'application/json'),
+        ))
+        proto.send_data(stream_id, b'{}', end_stream=True)
+        return
+
+    return machine
+
+@post('/machines/?')
+async def new_machine(server, proto, match, headers, stream_id):
+    mach = server.universe.create_machine()
+
+    await proto.send_headers(stream_id, (
+        (':status', '200'),
+        ('content-type', 'application/json'),
+    ))
+    payload = json.dumps({
+        'success': True,
+        'id': mach.id,
+        'secret': mach.secret,
+    }).encode('utf-8')
+    await proto.send_data(stream_id, payload, end_stream=True)
+
+@post('/machines/([^/]*)/start-process')
+async def machine_start_process(server, proto, match, headers, stream_id):
+    mach = server_verify_machine_auth(server, proto, stream_id, headers)
+    if mach is None:
+        return
+
+    proc = mach.start_process(b'')
     
-    def __init__(self, loop, server):
-        self.loop = loop
+    response_headers = (
+        (':status', '200'),
+        ('content-type', 'application/json'),
+        ('pid', proc.pid)
+    )
+    await proto.send_headers(stream_id, response_headers, end_stream=True)
+
+class H2Server(object):
+    def __init__(self, server):
         self.server = server
-        self.conn = H2Connection(client_side=False)
-        self.transport = None
+        self.exiting = False
 
-    def connection_made(self, transport):
-        self.transport = transport
-        self.conn.initiate_connection()
-        self.transport.write(self.conn.data_to_send())
+        self.pending_tasks = []
+        self.pending_clients = []
 
-    def data_received(self, data):
-        events = self.conn.receive_data(data)
-        self.transport.write(self.conn.data_to_send())
+    def wait_for(self, future, client=False):
+        self.pending_tasks.append(future)
+        if client:
+            self.pending_clients.append(future)
 
-        for event in events:
-            if isinstance(event, RequestReceived):
-                self.request_received(event.headers, event.stream_id)
+        def cleanup():
+            self.pending_tasks.remove(future)
+            if client:
+                self.pending_clients.remove(future)
+            
+        future.add_done_callback(lambda _: cleanup)
 
-            self.transport.write(self.conn.data_to_send())
-
-    def request_received(self, headers, stream_id):
-        self.loop.create_task(self.request_coro(headers, stream_id))
-
-    async def request_coro(self, headers, stream_id):
+    async def handle_request(self, proto, stream_id, headers):
         headers = collections.OrderedDict(headers)
-
+        
         done = False
-        for route in self.ROUTES:
-            fn = route(self, headers, stream_id)
+        for route in ROUTES:
+            fn = route(self.server, proto, headers, stream_id)
             if (fn is not None):
                 await fn()
                 done = True
@@ -98,107 +173,46 @@ class H2Protocol(asyncio.Protocol):
         if done is True:
             return
 
+        logger.debug('404: {} {}'.format(headers.get(':method', ''), headers.get(':path', '')))
         response_headers = (
             (':status', '404'),
-            ('content-type', 'application/json'),
         )
-        self.conn.send_headers(stream_id, response_headers, end_stream=True)
+        proto.send_headers(stream_id, response_headers, end_stream=True)
 
-    # Magical route-making helper.
-    def endpoint(routes, method=None):
-        def endpoint(regex):
-            def endpoint(fn):
-                rx = re.compile(regex)
-                    
-                def route(self, headers, stream_id):
-                    match = rx.fullmatch(headers[':path'])
-                    if match is None:
-                        return None
+    async def handle_client(self, proto):
+        while not self.exiting:
+            stream_id, headers = await proto.recv_request()
+            logger.debug('request: {}'.format(headers))
+            self.wait_for(self.server.loop.create_task(self.handle_request(proto, stream_id, headers)))
 
-                    if method is not None and headers[':method'] != method:
-                        return None
+    def start_client(self, proto):
+        self.wait_for(self.server.loop.create_task(self.handle_client(proto)), client=True)
 
-                    return lambda: fn(self, match, headers, stream_id)
+    @property
+    def sockets(self):
+        return self.proto.sockets
 
-                routes.append(route)
-            return endpoint
-        return endpoint
-    for k,v in {
-            'get': 'GET',
-            'post': 'POST',
-            }.items():
-        locals()[k] = endpoint(ROUTES, v)
-    endpoint = endpoint(ROUTES)
+    async def close(self):
+        self.exiting = True
+        self.proto.close()
 
-    def _verify_machine_auth(self, headers):
-        machine = headers.get('machine')
-        if machine is None:
-            return None
-        
-        machine = self.server.universe.machines.get(machine)
-        if machine is None:
-            return None
+        for client in self.pending_clients:
+            client.cancel()
 
-        mach_id = verify_machine_auth(headers, machine.id, machine.secret)
-        if mach_id is None:
-            return None
+        if len(self.pending_tasks) > 0:
+            await asyncio.wait(self.pending_tasks)
 
-        return machine
-        
-    def verify_machine_auth(self, stream_id, headers, fatal=True):
-        machine = self._verify_machine_auth(headers)
-        if fatal and (machine is None):
-            self.conn.send_headers(stream_id, (
-                (':status', '401'),
-                ('content-type', 'application/json'),
-            ))
-            self.conn.send_data(stream_id, b'{}', end_stream=True)
-            return
+async def start_server(server, host=None, port=0, **kw):
+    h2_server = H2Server(server)
+    h2_server.proto = await aioh2.start_server(
+        lambda p: h2_server.start_client(p),
+        loop=server.loop,
+        ssl=create_ssl_context(),
+        host=host,
+        port=port,
+        **kw)
 
-        return machine
-        
-    @get('/machines/([^/]*)')
-    async def machine(self, match, headers, stream_id):
-        response_headers = (
-            (':status', '200'),
-            ('content-type', 'application/json'),
-            ('node-id', match.group(1)),
-        )
-        self.conn.send_headers(stream_id, response_headers, end_stream=True)
-
-    @post('/machines/?')
-    async def new_machine(self, match, headers, stream_id):
-        mach = self.server.universe.create_machine()
-        
-        self.conn.send_headers(stream_id, (
-            (':status', '200'),
-            ('content-type', 'application/json'),
-        ))
-        payload = json.dumps({
-            'success': True,
-            'id': mach.id,
-            'secret': mach.secret,
-        }).encode('utf-8')
-        self.conn.send_data(stream_id, payload, end_stream=True)
-
-    @post('/machines/([^/]*)/start-process')
-    async def machine_start_process(self, match, headers, stream_id):
-        mach = self.verify_machine_auth(stream_id, headers)
-        if mach is None:
-            return
-
-        proc = mach.start_process(b'')
-        
-        response_headers = (
-            (':status', '200'),
-            ('content-type', 'application/json'),
-            ('pid', proc.pid)
-        )
-        self.conn.send_headers(stream_id, response_headers, end_stream=True)
-    
-
-def h2_protocol(*a, **kw):
-    return lambda: H2Protocol(*a, **kw)
+    return h2_server
 
 def get_config_path():
     home = os.environ.get('HOME')
