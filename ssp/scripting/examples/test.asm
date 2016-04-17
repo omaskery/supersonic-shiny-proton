@@ -17,8 +17,6 @@
 
 # send ls to the system (shell) subsystem, which pushes the result onto the stack
 send ["sys", "ls"] # this send uses the argpush rule
-# stack is now [..., ls result, "sys"]
-pop 1
 # stack is now [..., ls result]
 push ["."]
 # stack is now [..., ls result, ["."]]
@@ -37,8 +35,6 @@ push "this is some text to write to file I guess"
 
 # send an open message to the filesystem subsystem, file handle will be on stack afterwards
 send ["fs", "open", "file.bin"]
-# drop the sender
-pop 1
 # push beginings of send arguments for a filesystem write, we need the file handle next
 push ["fs", "write"]
 # swap the list we just pushed, and the file handle that should be beneath it
@@ -53,8 +49,8 @@ push 1
 append
 # stack should now be [..., ["fs", "write", file handle, data]] so send this on to fs
 send
-# drop the sender and return code from write
-push 2
+# drop the return code from write
+push 1
 pop
 
 # example of arithmetic (usual stack machine affair):
@@ -149,11 +145,12 @@ pop 1
 # some data to send
 push ["stand", "in", "for", "some", "bytecode", "here"]
 # some target destination
-push ["1.2.3.4:22"]
+push ["test:fs"]
 swap
 push 1
 append
 send			# pops the value from top of stack, identifies that target is a remote machine and sends popped values to that remote machine
+pop 1 			# clear send result
 
 # example of receiving from another process:
 
