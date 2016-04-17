@@ -34,14 +34,28 @@ class Machine(object):
 
     def start_process(self, program):
         parent = self.create_process(factory=machine_services.InterfaceService)
+        try:
+            proc = self.create_process(ppid=parent.pid)
+            proc.run_program(program)
         
-        proc = self.create_process(ppid=parent.pid)
-        proc.run_program(program)
-        
-        return (proc, parent)
+            return (proc, parent)
+        finally:
+            self.kill_process(parent.pid)
 
-    def interface_send(self, target, values):
-        pass
+    def kill_process(self, pid):
+        proc = self.processes.get(pid)
+        if proc is None:
+            return
+
+        del self.processes[pid]
+        proc.kill()
+
+    async def interface_send(self, target, values):
+        parent = self.create_process(factory=machine_services.InterfaceService)
+        try:
+            return await self.send_ipc(str(parent.pid), target, values)
+        finally:
+            self.kill_process(parent.pid)
 
     def register_service(self, proc, service):
         self.services[service] = proc

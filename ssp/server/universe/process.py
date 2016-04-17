@@ -17,6 +17,9 @@ class Process(object):
     async def send_ipc(self, sender, values):
         return None
 
+    def kill(self):
+        pass
+
 class EmuProcess(Process):
     STATE_IDLE = 0
     STATE_RUNNING = 1

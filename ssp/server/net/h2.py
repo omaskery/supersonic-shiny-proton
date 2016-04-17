@@ -155,7 +155,7 @@ async def machine_send(server, proto, match, headers, stream_id):
     target = match.group(2)
     payload = await proto.read_stream(stream_id, -1)
     values = json.loads(payload.decode('utf-8'))
-    ret = mach.interface_send(target, values)
+    ret = await mach.interface_send(target, values)
     
     response_headers = (
         (':status', '200'),
