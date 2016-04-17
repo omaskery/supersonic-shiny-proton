@@ -65,7 +65,7 @@ class Node(object):
 				for key, value in self.value.items()
 			])
 		elif self.type == NodeType.IDENTIFIER:
-			return lookup_table[self.value]
+			return lookup_table[self.value].collapse_to_value()
 
 	def pretty_str(self, indent=0, tabsize=2, separator='\n', prefix=""):
 		type_name = NodeType.to_string(self.type)

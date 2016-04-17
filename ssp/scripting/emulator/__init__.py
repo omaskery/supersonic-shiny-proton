@@ -209,6 +209,12 @@ class Emulator(object):
 		else:
 			self._inst_ptr = 0
 
+	def _jump(self, addr):
+		if 0 <= addr < len(self._program):
+			self._inst_ptr = addr
+		else:
+			self.trigger_error("attempted to jump out of bounds: {}".format(addr))
+
 	def _push(self, value):
 		self._stack.append(value)
 
@@ -533,13 +539,72 @@ class Emulator(object):
 
 	@staticmethod
 	def _inst_recv(emu, inst):
-		self._block(BlockingReason.RECV)
-		self._advance_inst()
+		emu._block(BlockingReason.RECV)
+		emu._advance_inst()
 
 	@staticmethod
 	def _inst_listen(emu, inst):
-		self._block(BlockingReason.LISTEN)
-		self._advance_inst()
+		emu._block(BlockingReason.LISTEN)
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_zero(emu, inst):
+		top = emu._pop()
+		if top is None: return
+		emu._push(top == 0)
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_gt(emu, inst):
+		top = emu._pop()
+		if top is None: return
+		emu._push(top > 0)
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_lt(emu, inst):
+		top = emu._pop()
+		if top is None: return
+		emu._push(top < 0)
+		emu._advance_inst()
+
+	@staticmethod
+	def _inst_ji(emu, inst):
+		top = emu._pop()
+		if top is None: return
+
+		if len(inst.parameters) != 1:
+			emu.trigger_error("ji expects one integer parameter")
+			return
+
+		target = inst.parameters[0]
+		if not isinstance(target, int):
+			emu.trigger_error("ji parameter must be of type integer")
+			return
+
+		if top:
+			emu._jump(target)
+		else:
+			emu._advance_inst()
+
+	@staticmethod
+	def _inst_jn(emu, inst):
+		top = emu._pop()
+		if top is None: return
+
+		if len(inst.parameters) != 1:
+			emu.trigger_error("jn expects one integer parameter")
+			return
+
+		target = inst.parameters[0]
+		if not isinstance(target, int):
+			emu.trigger_error("jn parameter must be of type integer")
+			return
+
+		if not top:
+			emu._jump(target)
+		else:
+			emu._advance_inst()
 
 	@staticmethod
 	def _binop_add(a, b):
@@ -579,5 +644,10 @@ class InstructionSet:
 		Opcode.LEN: (Emulator._inst_len,),
 		Opcode.RECV: (Emulator._inst_recv,),
 		Opcode.LISTEN: (Emulator._inst_listen,),
+		Opcode.ZERO: (Emulator._inst_zero,),
+		Opcode.GT: (Emulator._inst_gt,),
+		Opcode.LT: (Emulator._inst_lt,),
+		Opcode.JI: (Emulator._inst_ji,),
+		Opcode.JN: (Emulator._inst_jn,),
 	}
 

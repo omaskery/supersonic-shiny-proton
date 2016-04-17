@@ -20,6 +20,11 @@ class Opcode:
 	LEN = 16
 	SENDI = 17
 	POP = 18
+	GT = 19
+	LT = 20
+	ZERO = 21
+	JI = 22
+	JN = 23
 
 	@classmethod
 	def from_string(cls, string):
@@ -43,6 +48,11 @@ class Opcode:
 			'LOOKUP': cls.LOOKUP,
 			'LEN': cls.LEN,
 			'POP': cls.POP,
+			'GT?': cls.GT,
+			'LT?': cls.LT,
+			'ZERO?': cls.ZERO,
+			'JI': cls.JI,
+			'JN': cls.JN,
 		}.get(string.upper(), None)
 
 	@classmethod
@@ -67,5 +77,10 @@ class Opcode:
 			cls.LOOKUP: 'LOOKUP',
 			cls.LEN: 'LEN',
 			cls.POP: 'POP',
+			cls.GT: 'GT?',
+			cls.LT: 'LT?',
+			cls.ZERO: 'ZERO?',
+			cls.JI: 'JI',
+			cls.JN: 'JN',
 		}.get(integer, None)
 

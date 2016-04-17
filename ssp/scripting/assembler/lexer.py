@@ -182,7 +182,8 @@ class Lexer(object):
 	def _parse_identifier(self, pre_whitespace):
 		pos = self._pos()
 		identifier = ''
-		while not self._is_eof() and self._peek().isalpha():
+		valid = "_?"
+		while not self._is_eof() and self._peek().isalpha() or self._peek() in valid:
 			identifier += self._get()
 		return self._token(pos, TokenType.IDENTIFIER, identifier)\
 			.with_whitespace(pre_whitespace)
