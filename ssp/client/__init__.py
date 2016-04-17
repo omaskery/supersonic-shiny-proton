@@ -74,17 +74,17 @@ class Client(object):
         self.logger.debug('Body: {}'.format(body))
         
         headers = collections.OrderedDict(headers)
-        jsonBody = None
+        json_body = None
         
-        if headers.get('content-type').lower() == 'application/json':
-            bodyStr = body.decode('utf-8').strip()
-            if len(bodyStr) > 0:
-                jsonBody = json.loads(body.decode('utf-8'))
+        if headers.get('content-type', '').lower() == 'application/json':
+            body_str = body.decode('utf-8').strip()
+            if len(body_str) > 0:
+                json_body = json.loads(body.decode('utf-8'))
 
         resp = Response()
         resp.headers = headers
         resp.body = body
-        resp.json = jsonBody
+        resp.json = json_body
         return resp
         
 
