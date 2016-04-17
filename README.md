@@ -31,7 +31,7 @@ You will need a recent version of Python 3 and Python virtualenv to run SSP.
 ## Running SSP
 The SSP server can be launched with just:
 
-    ```
+    
     ssp-server
-    ```
+    
     

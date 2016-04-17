@@ -111,7 +111,6 @@ class Emulator(object):
 		self._program = program
 
 	def resume(self):
-		print('resume {} {}'.format(self._state, self._on_resume))
 		if (self._state != EmulatorState.RUNNING) and (self._on_resume is not None):
 			self._on_resume(self)
 	
