@@ -3,6 +3,8 @@ A hacking game or something probably?
 
 ## Setting up
 You will need a recent version of Python 3 and Python virtualenv to run SSP.
+
+
 1. Create a python virtualenv:
 
     ```
