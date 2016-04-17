@@ -116,7 +116,7 @@ async def server_verify_machine_auth(server, proto, stream_id, headers, fatal=Tr
 
 @post('/machines/?')
 async def new_machine(server, proto, match, headers, stream_id):
-    mach = server.universe.create_machine()
+    mach = server.universe.create_player_machine()
 
     await proto.send_headers(stream_id, (
         (':status', '200'),
@@ -143,7 +143,6 @@ async def machine_start_process(server, proto, match, headers, stream_id):
     response_headers = (
         (':status', '200'),
         ('content-type', 'application/json'),
-        ('pid', proc.pid)
     )
     await proto.send_headers(stream_id, response_headers, end_stream=True)
 
@@ -183,16 +182,16 @@ class H2Server(object):
                 return
 
             logger.debug('404: {} {}'.format(headers.get(':method', ''), headers.get(':path', '')))
-            response_headers = (
+            response_headers = [
                 (':status', '404'),
-            )
-            proto.send_headers(stream_id, response_headers, end_stream=True)
+            ]
+            await proto.send_headers(stream_id, response_headers, end_stream=True)
         except:
-            sys.excepthook(*sys.exc_info())
-            response_headers = (
+            response_headers = [
                 (':status', '500'),
-            )
-            proto.send_headers(stream_id, response_headers, end_stream=True)
+            ]
+            await proto.send_headers(stream_id, response_headers, end_stream=True)
+            raise
 
     async def handle_client(self, proto):
         while not self.exiting:

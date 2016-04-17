@@ -1,3 +1,4 @@
+import asyncio
 import ssp.scripting.emulator
 emu = ssp.scripting.emulator
 
@@ -13,6 +14,9 @@ class Process(object):
         self.ppid = ppid
         self.logger.debug('new process: ppid={}'.format(ppid))
 
+    async def send_ipc(self, sender, values):
+        return None
+
 class EmuProcess(Process):
     STATE_IDLE = 0
     STATE_RUNNING = 1
@@ -22,6 +26,7 @@ class EmuProcess(Process):
         super(EmuProcess, self).__init__(machine, pid, ppid)
 
         self.emu = emu.Emulator(verbose=100)
+        self.emu.logger = self.logger
         self.emu.hook_error(self._on_error)
         self.emu.hook_halted(self._on_halted)
         self.emu.hook_send(self._on_send)
@@ -39,12 +44,18 @@ class EmuProcess(Process):
             target = self.ppid
 
         self.logger.info("sending {} to {}".format(values, target))
+
+        def done(future):
+            exc = future.exception()
+            if exc is not None:
+                emu.trigger_error('error sending: {}'.format(repr(exc)))
+                raise exc
+            
+            emu.receive(None, future.result())
         
-        try:
-            ret = self.machine.send_ipc(self, target, values)
-            emu.receive(target, ret)
-        except Exception as e:
-            emu.trigger_error('error sending: {}'.format(repr(e)))
+        future = asyncio.get_event_loop().create_task(self.machine.send_ipc(self, target, values))
+        if self.emu.blocked:
+            future.add_done_callback(done)
         
     def _on_block(self, e, reason):
         self.logger.debug("blocked on {}".format(emu.BlockingReason.to_string(reason)))
@@ -56,9 +67,10 @@ class EmuProcess(Process):
     def _on_tick(self):
         self.emu.single_step()
 
-    def send_ipc(self, sender, values):
+    async def send_ipc(self, sender, values):
         self.logger.debug('receive {}, {}'.format(sender, values))
         self.emu.receive(sender, values)
+        return None # TODO: send responses
 
     def run_program(self, program):
         if self.emu.state == emu.EmulatorState.HALTED:

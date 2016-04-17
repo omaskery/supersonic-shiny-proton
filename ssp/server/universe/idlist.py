@@ -24,6 +24,9 @@ class IdList(object):
     def __getitem__(self, index):
         return self.dict[index]
 
+    def __setitem__(self, index, value):
+        self.dict[index] = value
+
     def __delitem__(self, index):
         del self.dict[index]
 
