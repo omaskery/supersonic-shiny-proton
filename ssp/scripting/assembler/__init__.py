@@ -1,8 +1,8 @@
 
 
-from .parser import Parser, Instruction
-from .lexer import Lexer, TokenType
+from .parser import Parser, Instruction, NodeType
 from ..opcode import Opcode
+from .lexer import Lexer
 
 
 from collections import namedtuple
@@ -35,6 +35,7 @@ class Assembler(object):
 
 	def __init__(self):
 		self._result = []
+		self._lookup_table = {}
 		self._messages = {
 			ErrorLevel.WARNING: [],
 			ErrorLevel.ERROR: [],
@@ -44,6 +45,10 @@ class Assembler(object):
 	def assemble(self, source, output):
 		lexer = Lexer(source)
 		parser = Parser(lexer)
+		special = {
+			'LABEL': self._label_statement,
+		}
+		offset = 0
 
 		while True:
 			instruction = parser.parse_instruction()
@@ -51,19 +56,33 @@ class Assembler(object):
 			if instruction is None:
 				break
 
-			if instruction.opcode is None:
-				self._error(instruction, "unknown opcode")
+			print(instruction.opcode.pretty_str(prefix="opcode: "))
+			for index, parameter in enumerate(instruction.parameters):
+				print(parameter.pretty_str(indent=1, prefix="param [{}] ".format(index)))
+
+			opcode_str = instruction.opcode.value
+			if opcode_str.upper() in special:
+				special[opcode_str.upper()](instruction, offset)
 				continue
 
-			info = Assembler.TYPE_INFO.get(instruction.opcode, None)
+			opcode = Opcode.from_string(opcode_str)
+			offset += 1
+
+			if opcode is None:
+				self._error(instruction, "unknown opcode: {}".format(
+					opcode_str
+				))
+				continue
+
+			info = Assembler.TYPE_INFO.get(opcode, None)
 			if info is None:
 				self._int_error(instruction, "no type info for opcode {}".format(
-					Opcode.to_string(instruction.opcode)
+					opcode_str
 				))
 				continue
 			if len(info) < 1:
 				self._int_error(instruction, "malformed type info for opcode {}".format(
-					Opcode.to_string(instruction.opcode)
+					opcode_str
 				))
 				continue
 
@@ -81,31 +100,44 @@ class Assembler(object):
 			parameters = []
 
 			bad_types = 0
-			for index, (param_type, param_value) in enumerate(instruction.parameters):
+			for index, param_node in enumerate(instruction.parameters):
 				if index < len(param_types):
 					expected_types = param_types[index]
 				else:
 					param_types[-1]
-				okay = self._check_parameter(param_type, expected_types)
+				okay = self._check_parameter(param_node.type, expected_types)
 				if not okay:
 					self._error(instruction, "param {} of {} is type {}, valid types: {}".format(
-						index + 1, Opcode.to_string(instruction.opcode),
-						TokenType.to_type_name(param_type),
-						", ".join(map(TokenType.to_type_name, expected_types))
+						index + 1, opcode_str,
+						NodeType.to_string(param_node.type),
+						", ".join(map(NodeType.to_string, expected_types))
 					))
 					bad_types += 1
-				parameters.append(param_value)
+				parameters.append(param_node) # don't collapse to value yet, do later
 			if bad_types > 0:
 				continue
 
-			self._emit(instruction.opcode, *parameters)
+			self._emit(opcode, *parameters)
 
-		errors = self.all_errors
-
-		if len(errors) == 0:
+		# if no errors, do output pass
+		if len(self.all_errors) == 0:
 			self._write_result(output)
 
-		return self.warnings + errors
+		return self.warnings + self.all_errors
+
+	def _label_statement(self, inst, offset):
+		if len(inst.parameters) != 1:
+			self._error(inst, "label statements take one identifier parameter")
+			return
+		label_node = inst.parameters[0]
+		if label_node.type != NodeType.IDENTIFIER:
+			self._error(inst, "label statement argument must be an identifier")
+			return
+		label = label_node.value
+		if label not in self._lookup_table:
+			self._lookup_table[label] = offset
+		else:
+			self._error("redefinition of label '{}'".format(label))
 
 	def get_message_counts(self):
 		return len(self.warnings), len(self.errors), len(self.internal_errors)
@@ -138,11 +170,7 @@ class Assembler(object):
 			output.write("{}\n".format(instruction.pretty_string()))
 
 	def _check_parameter(self, param_type, expected_type):
-		if expected_type is None:
-			okay = True
-		else:
-			okay = param_type in expected_type
-		return okay
+		return expected_type is None or param_type in expected_type
 
 	def _warn(self, inst, warning):
 		self._message(ErrorLevel.WARNING, inst, warning)
@@ -163,7 +191,11 @@ class Assembler(object):
 	def _write_result(self, output):
 		for inst in self._result:
 			self._write(output, inst.opcode)
-			self._write(output, inst.parameters)
+			try:
+				self._write(output, inst.parameters.collapse_to_value(self._lookup_table))
+			except KeyError as ke:
+				missing_label = ke.args[0]
+				self._error(inst, "undefined label '{}'".format(missing_label))
 
 	def _write(self, output, value):
 		output.write(msgpack.packb(value, use_bin_type=True))
@@ -172,22 +204,22 @@ class Assembler(object):
 		# Opcode: (Max#, TokenTypes for Param #1, TokenTypes for Param #2, ...),
 		Opcode.NOP: (0,),
 		Opcode.PUSH: (None, None),
-		Opcode.SEND: (1, (TokenType.START_LIST,)),
-		Opcode.SWAP: (1, (TokenType.INTEGER,)),
-		Opcode.DUP: (1, (TokenType.INTEGER,)),
-		Opcode.APPEND: (1, (TokenType.INTEGER,)),
+		Opcode.SEND: (1, (NodeType.LIST_LITERAL,)),
+		Opcode.SWAP: (1, (NodeType.INT_LITERAL,)),
+		Opcode.DUP: (1, (NodeType.INT_LITERAL,)),
+		Opcode.APPEND: (1, (NodeType.INT_LITERAL,)),
 		Opcode.ADD: (0,),
 		Opcode.SUB: (0,),
 		Opcode.MUL: (0,),
 		Opcode.DIV: (0,),
 		Opcode.RECV: (0,),
-		Opcode.LISTEN: (1, (TokenType.INTEGER,)),
-		Opcode.DICT: (1, (TokenType.INTEGER,)),
-		Opcode.LIST: (1, (TokenType.INTEGER,)),
-		Opcode.PUT: (1, (TokenType.INTEGER,)),
-		Opcode.LOOKUP: (1, (TokenType.INTEGER, TokenType.STRING)),
+		Opcode.LISTEN: (1, (NodeType.INT_LITERAL,)),
+		Opcode.DICT: (1, (NodeType.INT_LITERAL,)),
+		Opcode.LIST: (1, (NodeType.INT_LITERAL,)),
+		Opcode.PUT: (1, (NodeType.INT_LITERAL,)),
+		Opcode.LOOKUP: (1, (NodeType.INT_LITERAL, NodeType.STR_LITERAL)),
 		Opcode.LEN: (0,),
-		Opcode.SENDI: (1, (TokenType.START_LIST,)),
-		Opcode.POP: (1, (TokenType.INTEGER,)),
+		Opcode.SENDI: (1, (NodeType.LIST_LITERAL,)),
+		Opcode.POP: (1, (NodeType.INT_LITERAL,)),
 	}
 

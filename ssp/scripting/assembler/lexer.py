@@ -45,16 +45,6 @@ class TokenType:
 			cls.COLON: 'COLON',
 		}.get(integer, None)
 
-	@classmethod
-	def to_type_name(cls, integer):
-		return {
-			cls.INTEGER: 'integer',
-			cls.REAL: 'real',
-			cls.STRING: 'string',
-			cls.START_LIST: 'list',
-			cls.START_DICT: 'dictionary',
-		}.get(integer, None)
-
 
 class Token(object):
 	
