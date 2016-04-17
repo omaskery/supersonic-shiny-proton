@@ -191,8 +191,9 @@ class Parser(object):
 			if colon.type != TokenType.COLON:
 				print("expected colon at", colon.pos)
 				break
+			key = Node(NodeType.STR_LITERAL, key_token.value)
 			value = self._parse_value(self._lexer.get_token())
-			values[key_token.value] = value
+			values[key] = value
 			first = False
 		end_token = self._lexer.get_token()
 		if end_token.type != TokenType.END_DICT:

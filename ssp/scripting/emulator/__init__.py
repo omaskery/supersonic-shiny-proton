@@ -570,14 +570,18 @@ class Emulator(object):
 
 	@staticmethod
 	def _inst_ji(emu, inst):
+		if len(inst.parameters) == 0:
+			target = emu._pop()
+			if target is None: return
+		elif len(inst.parameters) == 1:
+			target = inst.parameters[0]
+		else:
+			emu.trigger_error("ji expects zero or one integer parameters")
+			return
+
 		top = emu._pop()
 		if top is None: return
 
-		if len(inst.parameters) != 1:
-			emu.trigger_error("ji expects one integer parameter")
-			return
-
-		target = inst.parameters[0]
 		if not isinstance(target, int):
 			emu.trigger_error("ji parameter must be of type integer")
 			return
@@ -589,14 +593,18 @@ class Emulator(object):
 
 	@staticmethod
 	def _inst_jn(emu, inst):
+		if len(inst.parameters) == 0:
+			target = emu._pop()
+			if target is None: return
+		elif len(inst.parameters) == 1:
+			target = inst.parameters[0]
+		else:
+			emu.trigger_error("jn expects zero or one integer parameters")
+			return
+
 		top = emu._pop()
 		if top is None: return
 
-		if len(inst.parameters) != 1:
-			emu.trigger_error("jn expects one integer parameter")
-			return
-
-		target = inst.parameters[0]
 		if not isinstance(target, int):
 			emu.trigger_error("jn parameter must be of type integer")
 			return

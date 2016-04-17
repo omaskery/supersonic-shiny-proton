@@ -6,6 +6,7 @@ from .lexer import Lexer
 
 
 from collections import namedtuple
+import traceback
 import msgpack
 
 
@@ -33,7 +34,9 @@ class AssemblerMessage(namedtuple('AssemblerMessage', 'level line col message'))
 
 class Assembler(object):
 
-	def __init__(self):
+	def __init__(self, verbose=0):
+		self._current_inst = None
+		self._verbose = verbose
 		self._result = []
 		self._lookup_table = {}
 		self._messages = {
@@ -43,15 +46,21 @@ class Assembler(object):
 		}
 
 	def assemble(self, source, output):
-		self._ingest_pass(source)
+		try:
+			self._ingest_pass(source)
 
-		# if no errors, do type checking & label replacement pass
-		if len(self.all_errors) == 0:
-			self._lookup_and_type_pass()
+			# if no errors, do type checking & label replacement pass
+			if len(self.all_errors) == 0:
+				self._lookup_and_type_pass()
 
-		# if no errors, do output pass
-		if len(self.all_errors) == 0:
-			self._output_pass(output)
+			# if no errors, do output pass
+			if len(self.all_errors) == 0:
+				self._output_pass(output)
+		except Exception as ex:
+			self._int_error(self._current_inst, "exception {}: {}".format(
+				ex.__class__.__name__, ex
+			))
+			traceback.print_tb(ex.__traceback__)
 
 		return self.warnings + self.all_errors
 
@@ -69,9 +78,14 @@ class Assembler(object):
 			if instruction is None:
 				break
 
-			print(instruction.opcode.pretty_str(prefix="opcode: "))
-			for index, parameter in enumerate(instruction.parameters):
-				print(parameter.pretty_str(indent=1, prefix="param [{}] ".format(index)))
+			self._current_inst = instruction
+
+			if self._verbose > 0:
+				print(instruction.opcode.pretty_str(prefix="opcode: "))
+				for index, parameter in enumerate(instruction.parameters):
+					print(parameter.pretty_str(indent=1, prefix="param [{}] ".format(
+						index
+					)))
 
 			opcode_str = instruction.opcode.value
 			if opcode_str.upper() in special:
@@ -91,6 +105,8 @@ class Assembler(object):
 
 	def _lookup_and_type_pass(self):
 		def _check(inst):
+			self._current_inst = inst
+
 			info = Assembler.TYPE_INFO.get(inst.opcode, None)
 			if info is None:
 				self._int_error(inst, "no type info for opcode {}".format(
@@ -141,6 +157,7 @@ class Assembler(object):
 
 	def _output_pass(self, output):
 		for inst in self._result:
+			self._current_inst = inst
 			self._write(output, inst.opcode)
 			self._write(output, inst.parameters)
 
@@ -191,7 +208,7 @@ class Assembler(object):
 	def _check_parameter(self, param_node, expected_type):
 		if param_node.type == NodeType.IDENTIFIER:
 			lookup = self._lookup_table[param_node.value]
-			return lookup.type in expected_type
+			return expected_type is None or lookup.type in expected_type
 		else:
 			return expected_type is None or param_node.type in expected_type
 

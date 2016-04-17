@@ -11,10 +11,8 @@ import os
 def main():
 	args = get_args()
 
-	if args.verbose is not None:
+	if args.verbose > 0:
 		print("verbose level:", args.verbose)
-	else:
-		args.verbose = 0
 
 	if args.output is None:
 		if not args.disasm:
@@ -36,7 +34,7 @@ def main():
 		print("output path:", args.output)
 
 	source = FileSource(input_file, args.input)
-	assembler = Assembler()
+	assembler = Assembler(verbose=args.verbose)
 	if not args.disasm:
 		messages = assembler.assemble(source, output_file)
 	else:
@@ -72,7 +70,7 @@ def get_args():
 		help='disassembles a binary file into assembly instead of assembling'
 	)
 	parser.add_argument(
-		'-v', '--verbose', action='count',
+		'-v', '--verbose', action='count', default=0,
 		help='enables verbose output'
 	)
 	return parser.parse_args()

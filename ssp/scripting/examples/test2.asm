@@ -7,12 +7,18 @@
 
 label start
 
+	push [".", "iteration:"]
+	dup -2
+	append 1
+	sendi
+
 	push 1
 	sub
 
 	dup -1
 	zero?
-	jn start
+	push start
+	jn
 
 	pop 1
 
