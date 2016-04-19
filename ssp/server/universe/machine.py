@@ -1,7 +1,10 @@
 import logging
 import string
 import weakref
+from pyee import EventEmitter
+
 from . import process, idlist, machine_services
+
 
 def maybe_remote_address(addr):
     if not isinstance(addr, str):
@@ -27,9 +30,13 @@ class Machine(object):
         self.register_tick = universe.register_tick
         self.unregister_tick = universe.unregister_tick
 
+        self.events = EventEmitter()
+
     def create_process(self, ppid=None, factory=process.EmuProcess):
         pid = self.processes.add_fn(lambda id: factory(self, id, ppid))
         proc = self.processes[pid]
+
+        self.events.emit('process_created', proc)
         return proc
 
     def start_process(self, program):
@@ -37,7 +44,7 @@ class Machine(object):
         try:
             proc = self.create_process(ppid=parent.pid)
             proc.run_program(program)
-        
+
             return (proc, parent)
         finally:
             self.kill_process(parent.pid)
@@ -48,6 +55,7 @@ class Machine(object):
             return
 
         del self.processes[pid]
+        self.events.emit('process_killed', proc)
         proc.kill()
 
     async def interface_send(self, target, values):
