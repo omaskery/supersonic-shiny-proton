@@ -257,5 +257,6 @@ class Assembler(object):
 		Opcode.ZERO: (0,),
 		Opcode.JI: (1, (NodeType.INT_LITERAL,)),
 		Opcode.JN: (1, (NodeType.INT_LITERAL,)),
+		Opcode.JMP: (1, (NodeType.INT_LITERAL,)),
 	}
 

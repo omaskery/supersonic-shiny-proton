@@ -14,12 +14,15 @@ def random_string_id_generator(length=20, charset=string.ascii_uppercase + strin
         yield generate_random_id(length, charset, rand)
 
 class IdList(object):
-    def __init__(self, id_generator=None):
+    def __init__(self, id_generator=None, use_free_list=False):
         if id_generator is None:
             id_generator = integer_id_generator()
         
         self.dict = {}
         self.id_generator = id_generator
+            
+        self._use_free_list = use_free_list
+        self._free_list = []
 
     def __getitem__(self, index):
         return self.dict[index]
@@ -36,8 +39,11 @@ class IdList(object):
     def generate_id(self):
         id = None
         
-        while (id is None) or (id in self.dict):
-            id = next(self.id_generator)
+        if self._use_free_list and len(self._free_list) > 0:
+            id = self._free_list.pop(0)
+        else:
+            while (id is None) or (id in self.dict):
+                id = next(self.id_generator)
 
         return id
 
@@ -54,6 +60,8 @@ class IdList(object):
         
     def remove(self, id):
         del self.dict[id]
+        if self._use_free_list:
+            self._free_list.append(id)
 
     def keys(self):
         return self.dict.keys()
